@@ -1,0 +1,63 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"type": "shell",
+			"label": "Clean",
+			"command": "rm -rf build && mkdir build",
+			"detail": "Delete build directory",
+			"problemMatcher": []
+		},
+		{
+			"type": "shell",
+			"label": "Conan Install",
+			"command": "conan install . -pr:b cpp20 -pr:h ${input:ConanProfile} --build=missing",
+			"detail": "Install conan dependencies",
+			"runOptions": { "reevaluateOnRerun": false},
+			"problemMatcher": []
+		},
+		{
+			"type": "shell",
+			"label": "CMake Build",
+			"command": "cmake --build . --preset conan-debug",
+			"detail": "Build",
+			"problemMatcher": ["$gcc"]
+		},
+		{
+			"type": "shell",
+			"label": "CMake Configure",
+			"command": "cmake .. --preset conan-debug",
+			"detail": "Build",
+			"options" : {
+				"cwd" : "${workspaceFolder}/build"
+			},
+			"problemMatcher": []
+		},
+		{
+			"type": "shell",
+			"label": "Clean and Build",
+			"dependsOrder": "sequence",
+			"dependsOn": [
+				"Clean",
+				"Conan Install",
+				"CMake Configure",
+				"CMake Build"
+			],
+			"problemMatcher": []
+		}
+	],
+	"inputs": [
+		{
+			"id": "ConanProfile",
+			"type" : "pickString",
+			"description" : "Conan Profile:",
+			"default" : "cpp20",
+			"options": [
+				"emscripten",
+				"cpp20",
+				"emscripten_dbg",
+				"cpp20_dbg"
+			]
+		},
+	]	
+}
