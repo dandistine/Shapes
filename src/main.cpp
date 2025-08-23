@@ -56,9 +56,15 @@ enum class ShapePrototypes {
 	Pentagon,
 	Star5_2,
 	Star6_2,
+	Star7_3,
 	Star8_2,
 	Star9_3
 };
+
+olc::Pixel RandomColor()
+{
+	return olc::Pixel(rand() % 256, rand() % 256, rand() % 256);
+}
 
 std::map<ShapePrototypes, Prototype> prototypes;
 
@@ -579,6 +585,8 @@ struct GameplayState : public State {
 		auto& s = reg.emplace<Shape>(entity, prototypes[type]);
 		s.MoveTo(pos);
 		s.color = color;
+		utilities::random::uniform_real_distribution<float> dist {0, olc::utils::geom2d::pi * 2.0f};
+		s.theta = dist(rng);
 		reg.emplace<ParticleComponent>(entity);
 		auto& p = reg.emplace<PhysicsComponent>(entity);
 		p.force = vel.norm() * 600000.0f;
@@ -591,7 +599,7 @@ struct GameplayState : public State {
 		for(int i = 0; i < 4; i++) {
 			utilities::random::uniform_real_distribution<float> dist {0, olc::utils::geom2d::pi * 2.0f};
 			const float angle = dist(rng);
-			spawnParticle(e.position, olc::vf2d{1.0, angle}.cart());
+			spawnParticle(e.position, olc::vf2d{1.0, angle}.cart(), RandomColor(), static_cast<ShapePrototypes>(rand() % 9));
 		}
 	}
 
@@ -611,6 +619,7 @@ struct GameplayState : public State {
 		auto entity = reg.create();
 		auto& s = reg.emplace<Shape>(entity, prototypes[ShapePrototypes::Square]);
 		s.color = spawn.color;
+		s.scale = 2.0f;
 
 		s.MoveTo(spawn.position);
 		reg.emplace<EnemyComponent>(entity);
@@ -625,8 +634,9 @@ struct GameplayState : public State {
 		score = 0.0f;
 		player_entity = reg.create();
 		reg.emplace<PlayerComponent>(player_entity);
-		auto& s = reg.emplace<Shape>(player_entity, prototypes[ShapePrototypes::Square]);
+		auto& s = reg.emplace<Shape>(player_entity, prototypes[ShapePrototypes::Star7_3]);
 		s.MoveTo(pge->GetScreenSize() / 2.0f);
+		s.scale = 4.0f;
 		reg.emplace<PhysicsComponent>(player_entity);
 		
 		physics_system = std::make_unique<PhysicsSystem>(reg, pge);
@@ -711,20 +721,125 @@ public:
 		game_states.insert(std::make_pair(GameState::Gameplay, std::make_unique<GameplayState>(this)));
 
 		// Generate the prototypes
-		Prototype triangle_proto;
-		triangle_proto.tris.push_back(olc::utils::geom2d::triangle<float>{{0, -8}, {8, 8}, {-8, 8}});
-		prototypes.insert({ShapePrototypes::Triangle, triangle_proto});
+		// Prototype triangle_proto;
+		// triangle_proto.tris.push_back(olc::utils::geom2d::triangle<float>{{0, -8}, {8, 8}, {-8, 8}});
+		// prototypes.insert({ShapePrototypes::Triangle, triangle_proto});
 
-		Prototype square_proto;
-		square_proto.tris.push_back(olc::utils::geom2d::triangle<float>{{-8, -8}, {8, -8}, {-8, 8}});
-		square_proto.tris.push_back(olc::utils::geom2d::triangle<float>{{8, -8}, {8, 8}, {-8, 8}});
-		prototypes.insert({ShapePrototypes::Square, square_proto});
+		// Prototype square_proto;
+		// square_proto.tris.push_back(olc::utils::geom2d::triangle<float>{{-8, -8}, {8, -8}, {-8, 8}});
+		// square_proto.tris.push_back(olc::utils::geom2d::triangle<float>{{8, -8}, {8, 8}, {-8, 8}});
+		// prototypes.insert({ShapePrototypes::Square, square_proto});
 		
 		// Create the cursor shape
 		Prototype cursor_proto;
 		cursor_proto.tris.push_back(olc::utils::geom2d::triangle<float>{{0, -8}, {8, 8}, {0, 0}});
 		cursor_proto.tris.push_back(olc::utils::geom2d::triangle<float>{{0, -8}, {0, 0}, {-8, 8}});
 		prototypes.insert({ShapePrototypes::Cursor, cursor_proto});
+
+		// Create the star52 shape and the pentagon shape
+		Prototype star52_proto;
+		Prototype pentagon_proto;
+		{
+			std::array<olc::vf2d, 5> outer_points;
+			std::array<olc::vf2d, 5> inner_points;
+
+			for(int i = 0; i < 5; i++) {
+				float outer_angle = ((90.0f - (72.0f * i)) * olc::utils::geom2d::pi) / 180.0f;
+				//float inner_angle = ((54.0f - (72.0f * i)) * olc::utils::geom2d::pi) / 180.0f;
+				outer_points[i] = olc::vf2d{-8.0f * std::cosf(outer_angle), -8.0f * std::sinf(outer_angle)};
+				//inner_points[i] = olc::vf2d{std::cosf(inner_angle), std::sinf(inner_angle)};
+			}
+
+			star52_proto.tris.push_back(olc::utils::geom2d::triangle<float>{{outer_points[0]}, {outer_points[2]}, {0.0f, 0.0f}});
+			star52_proto.tris.push_back(olc::utils::geom2d::triangle<float>{{outer_points[1]}, {outer_points[3]}, {0.0f, 0.0f}});
+			star52_proto.tris.push_back(olc::utils::geom2d::triangle<float>{{outer_points[2]}, {outer_points[4]}, {0.0f, 0.0f}});
+			star52_proto.tris.push_back(olc::utils::geom2d::triangle<float>{{outer_points[3]}, {outer_points[0]}, {0.0f, 0.0f}});
+			star52_proto.tris.push_back(olc::utils::geom2d::triangle<float>{{outer_points[4]}, {outer_points[1]}, {0.0f, 0.0f}});
+
+			pentagon_proto.tris.push_back(olc::utils::geom2d::triangle<float>{{outer_points[0]}, {outer_points[1]}, {0.0f, 0.0f}});
+			pentagon_proto.tris.push_back(olc::utils::geom2d::triangle<float>{{outer_points[1]}, {outer_points[2]}, {0.0f, 0.0f}});
+			pentagon_proto.tris.push_back(olc::utils::geom2d::triangle<float>{{outer_points[2]}, {outer_points[3]}, {0.0f, 0.0f}});
+			pentagon_proto.tris.push_back(olc::utils::geom2d::triangle<float>{{outer_points[3]}, {outer_points[4]}, {0.0f, 0.0f}});
+			pentagon_proto.tris.push_back(olc::utils::geom2d::triangle<float>{{outer_points[4]}, {outer_points[0]}, {0.0f, 0.0f}});
+
+			prototypes.insert({ShapePrototypes::Star5_2, star52_proto});
+			prototypes.insert({ShapePrototypes::Pentagon, pentagon_proto});
+		}
+
+		// Create the star62 shape and the triangle shape since they share some points
+		Prototype star62_proto;
+		Prototype triangle_proto;
+		{
+			std::array<olc::vf2d, 6> points;
+			for(int i = 0; i < 6; i++) {
+				float angle = ((90.0f - (60.0f * i)) * olc::utils::geom2d::pi) / 180.0f;
+				points[i] = olc::vf2d{-8.0f * std::cosf(angle), -8.0f * std::sinf(angle)};
+			}
+
+			star62_proto.tris.push_back(olc::utils::geom2d::triangle<float>{points[0], points[2], points[4]});
+			star62_proto.tris.push_back(olc::utils::geom2d::triangle<float>{points[1], points[3], points[5]});
+			
+			triangle_proto.tris.push_back(olc::utils::geom2d::triangle<float>{points[0], points[2], points[4]});
+
+			prototypes.insert({ShapePrototypes::Star6_2, star62_proto});
+			prototypes.insert({ShapePrototypes::Triangle, triangle_proto});
+		}
+
+		// Create the star82 shape and the square since they share some points
+		Prototype star82_proto;
+		Prototype square_proto;
+		{
+			std::array<olc::vf2d, 8> points;
+			for(int i = 0; i < 8; i++) {
+				float angle = ((90.0f - (45.0f * i)) * olc::utils::geom2d::pi) / 180.0f;
+				points[i] = olc::vf2d{-8.0f * std::cosf(angle), -8.0f * std::sinf(angle)};
+			}
+
+			star82_proto.tris.push_back(olc::utils::geom2d::triangle<float>{points[0], points[2], points[4]});
+			star82_proto.tris.push_back(olc::utils::geom2d::triangle<float>{points[1], points[3], points[5]});
+			star82_proto.tris.push_back(olc::utils::geom2d::triangle<float>{points[4], points[6], points[0]});
+			star82_proto.tris.push_back(olc::utils::geom2d::triangle<float>{points[5], points[7], points[1]});
+
+			square_proto.tris.push_back(olc::utils::geom2d::triangle<float>{points[1], points[3], points[5]});
+			square_proto.tris.push_back(olc::utils::geom2d::triangle<float>{points[5], points[7], points[1]});
+			
+			prototypes.insert({ShapePrototypes::Star8_2, star82_proto});
+			prototypes.insert({ShapePrototypes::Square, square_proto});
+		}
+
+		// Create the star93 shape
+		Prototype star93_proto;
+		{
+			std::array<olc::vf2d, 9> points;
+			for(int i = 0; i < 9; i++) {
+				float angle = ((90.0f - (40.0f * i)) * olc::utils::geom2d::pi) / 180.0f;
+				points[i] = olc::vf2d{-8.0f * std::cosf(angle), -8.0f * std::sinf(angle)};
+			}
+
+			star93_proto.tris.push_back(olc::utils::geom2d::triangle<float>{points[0], points[3], points[6]});
+			star93_proto.tris.push_back(olc::utils::geom2d::triangle<float>{points[1], points[4], points[7]});
+			star93_proto.tris.push_back(olc::utils::geom2d::triangle<float>{points[2], points[5], points[8]});
+			prototypes.insert({ShapePrototypes::Star9_3, star93_proto});
+	
+		}
+
+		Prototype star73_proto;
+		{
+			std::array<olc::vf2d, 7> points;
+			for(int i = 0; i < 7; i++) {
+				float angle = ((90.0f - ((360.0f/7.0f) * i)) * olc::utils::geom2d::pi) / 180.0f;
+				points[i] = olc::vf2d{-8.0f * std::cosf(angle), -8.0f * std::sinf(angle)};
+			}
+
+			star73_proto.tris.push_back(olc::utils::geom2d::triangle<float>(points[0], points[3], {0.0f, 0.0f}));
+			star73_proto.tris.push_back(olc::utils::geom2d::triangle<float>(points[1], points[4], {0.0f, 0.0f}));
+			star73_proto.tris.push_back(olc::utils::geom2d::triangle<float>(points[2], points[5], {0.0f, 0.0f}));
+			star73_proto.tris.push_back(olc::utils::geom2d::triangle<float>(points[3], points[6], {0.0f, 0.0f}));
+			star73_proto.tris.push_back(olc::utils::geom2d::triangle<float>(points[4], points[0], {0.0f, 0.0f}));
+			star73_proto.tris.push_back(olc::utils::geom2d::triangle<float>(points[5], points[1], {0.0f, 0.0f}));
+			star73_proto.tris.push_back(olc::utils::geom2d::triangle<float>(points[6], points[2], {0.0f, 0.0f}));
+			prototypes.insert({ShapePrototypes::Star7_3, star73_proto});
+		}
 
 		return true;
 	}
