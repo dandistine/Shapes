@@ -49,13 +49,24 @@ struct Prototype {
 	std::vector<olc::utils::geom2d::triangle<float>> tris;
 };
 
+enum class ShapePrototypes {
+	Triangle,
+	Square,
+	Cursor,
+	Pentagon,
+	Star5_2,
+	Star6_2,
+	Star8_2,
+	Star9_3
+};
+
+std::map<ShapePrototypes, Prototype> prototypes;
+
 struct Shape {
 	using iterator = std::vector<olc::utils::geom2d::triangle<float>>::iterator;
 	using const_iterator = std::vector<olc::utils::geom2d::triangle<float>>::const_iterator;
 
-	Shape(const Prototype& other) : tris(other.tris), prototype(other) {
-		
-	}
+	Shape(const Prototype& other) : tris(other.tris), prototype(other) { }
 
 	iterator begin() {
 		return tris.begin();
@@ -82,8 +93,8 @@ struct Shape {
 	void MoveTo(olc::vf2d new_position) {
 		position = new_position;
 		const auto sc = olc::vf2d{std::sinf(theta), std::cosf(theta)};
-		const float s = std::sin(theta);
-		const float c = std::cos(theta);
+		//const float s = std::sin(theta);
+		//const float c = std::cos(theta);
 		tris.clear();
 
 		for(const auto& t : prototype) {
@@ -97,7 +108,7 @@ struct Shape {
 		}
 	}
 
-	bool intersects(const Shape& other) {
+	bool intersects(const Shape& other) const {
 		for(const auto& t : other) {
 			for(const auto& self_t : tris) {
 				if(olc::utils::geom2d::overlaps(t, self_t)) {
@@ -128,14 +139,6 @@ struct Enemy : public Shape {
 	float health {10.0f};
 	olc::vf2d velocity {0.0f, 0.0f};
 };
-
-// struct Bullet : public Shape {
-// 	Bullet(const Prototype& proto) : Shape(proto) {};
-
-// 	int hit_count {1};
-// 	float damage {10.0f};
-// 	olc::vf2d velocity {0.0f, 0.0f};
-// };
 
 
 olc::vi2d print(olc::utils::geom2d::triangle<float>& tri, olc::vi2d pos, olc::PixelGameEngine* pge) {
@@ -171,7 +174,13 @@ struct EnemyDeath {
 struct EnemyComponent {
 	float health {10.0f};
 	float damage {1.0f};
+	float attack_timer {0.0f};
+	float attack_cooldown {1.0f};
 	olc::vf2d velocity {0.0f, 0.0f};
+};
+
+struct PlayerComponent {
+	float health {10.0f};
 };
 
 struct BulletComponent {
@@ -264,6 +273,35 @@ struct EnemyMovementSystem : public System {
 			const auto& dir = player_position - s.position;
 
 			physics.force += dir.norm() * 4500.0f;
+		}
+	}
+private:
+	entt::entity player_entity;
+};
+
+struct EnemyAttackSystem : public System {
+	EnemyAttackSystem(entt::entity player, entt::registry& reg, olc::PixelGameEngine* pge) : player_entity(player), System(reg, pge) {};
+
+	void OnUserUpdate(float fElapsedTime) override {
+		const auto& view = reg.view<PhysicsComponent, Shape, EnemyComponent>();
+		const auto& player_shape = reg.get<Shape>(player_entity);
+
+		for(auto entity : view) {
+			const auto& s = view.get<Shape>(entity);
+			auto& e = view.get<EnemyComponent>(entity);
+
+			e.attack_timer += fElapsedTime;
+			
+			if((e.attack_timer > e.attack_cooldown) && s.intersects(player_shape)) {
+				const auto& dir = player_shape.position - s.position;
+				auto& physics = view.get<PhysicsComponent>(entity);
+				physics.force += dir.norm() * -450000.0f;
+				std::cout << physics.force.str() << std::endl;
+
+				auto& player = reg.get<PlayerComponent>(player_entity);
+				player.health -= e.damage;
+				e.attack_timer = 0.0f;
+			}
 		}
 	}
 private:
@@ -375,8 +413,8 @@ private:
 	entt::dispatcher& dispatcher;
 	// Every power_time seconds the enemy power will scale by power_scale
 	// This happens smoothly over the duration
-	float power_scale {2.0f};
-	float power_time {40.0f};
+	float power_scale {3.0f};
+	float power_time {15.0f};
 	float accumulated_power {0.0f};
 	float spawn_cost {10.0f};
 	float total_time {0.0f};
@@ -468,8 +506,8 @@ struct GameplayState : public State {
 	//std::unique_ptr<Shape> player;
 	entt::entity player_entity;
 
-	Prototype square_proto;
-	Prototype cursor_proto;
+	//Prototype square_proto;
+	//Prototype cursor_proto;
 
 	float fTotalTime {0.0f};
 	float enemyTimer {0.0f};
@@ -494,22 +532,23 @@ struct GameplayState : public State {
 	std::unique_ptr<System> spawn_enemy_system;
 	std::unique_ptr<System> bullet_system;
 	std::unique_ptr<System> particle_system;
+	std::unique_ptr<System> enemy_attack_system;
 
 	explicit GameplayState(olc::PixelGameEngine* pge) : State(pge) {
 		// Create the square
-		square_proto.tris.push_back(olc::utils::geom2d::triangle<float>{{-8, -8}, {8, -8}, {-8, 8}});
-		square_proto.tris.push_back(olc::utils::geom2d::triangle<float>{{8, -8}, {8, 8}, {-8, 8}});
+		// square_proto.tris.push_back(olc::utils::geom2d::triangle<float>{{-8, -8}, {8, -8}, {-8, 8}});
+		// square_proto.tris.push_back(olc::utils::geom2d::triangle<float>{{8, -8}, {8, 8}, {-8, 8}});
 		
-		// Create the cursor shape
-		cursor_proto.tris.push_back(olc::utils::geom2d::triangle<float>{{0, -8}, {8, 8}, {0, 0}});
-		cursor_proto.tris.push_back(olc::utils::geom2d::triangle<float>{{0, -8}, {0, 0}, {-8, 8}});
+		// // Create the cursor shape
+		// cursor_proto.tris.push_back(olc::utils::geom2d::triangle<float>{{0, -8}, {8, 8}, {0, 0}});
+		// cursor_proto.tris.push_back(olc::utils::geom2d::triangle<float>{{0, -8}, {0, 0}, {-8, 8}});
 
 		rng.seed(std::random_device{}());
 	}
 
 	void tickEnemyTimer() {
 		auto entity = reg.create();
-		auto& s = reg.emplace<Shape>(entity, square_proto);
+		auto& s = reg.emplace<Shape>(entity, prototypes[ShapePrototypes::Square]);
 		s.color = olc::YELLOW;
 
 		utilities::random::uniform_real_distribution<float> dist {0, olc::utils::geom2d::pi * 2.0f};
@@ -523,26 +562,26 @@ struct GameplayState : public State {
 		reg.emplace<PhysicsComponent>(entity);
 	}
 
-	void spawnBullet(olc::vf2d pos, olc::vf2d vel) {
+	void spawnBullet(olc::vf2d pos, olc::vf2d vel, ShapePrototypes type = ShapePrototypes::Square) {
 		auto entity = reg.create();
-		auto& s = reg.emplace<Shape>(entity, square_proto);
+		auto& s = reg.emplace<Shape>(entity, prototypes[type]);
 		s.MoveTo(pos);
-		s.scale = 0.3f;
+		s.theta = vel.polar().y + olc::utils::geom2d::pi / 2.0f;
+		s.scale = 0.4f;
 		auto& b = reg.emplace<BulletComponent>(entity, vel);
 		auto& p = reg.emplace<PhysicsComponent>(entity);
 		p.force = vel.norm() * 300000.0f;
 		p.friction = 1.0;
 	}
 
-	void spawnParticle(olc::vf2d pos, olc::vf2d vel, olc::Pixel color = olc::YELLOW) {
+	void spawnParticle(olc::vf2d pos, olc::vf2d vel, olc::Pixel color = olc::YELLOW, ShapePrototypes type = ShapePrototypes::Triangle) {
 		auto entity = reg.create();
-		auto& s = reg.emplace<Shape>(entity, square_proto);
+		auto& s = reg.emplace<Shape>(entity, prototypes[type]);
 		s.MoveTo(pos);
 		s.color = color;
 		reg.emplace<ParticleComponent>(entity);
 		auto& p = reg.emplace<PhysicsComponent>(entity);
 		p.force = vel.norm() * 600000.0f;
-		//p.friction = 1.0;
 	}
 
 	// Event responding to an enemy death
@@ -564,13 +603,13 @@ struct GameplayState : public State {
 		p.force = input.move_direction * 5000.0f;
 
 		if(input.fire) {
-			spawnBullet(s.position, input.aim_direction * player_speed);
+			spawnBullet(s.position, input.aim_direction);
 		}
 	}
 
 	void on_spawn_enemy(const SpawnEnemy& spawn)  {
 		auto entity = reg.create();
-		auto& s = reg.emplace<Shape>(entity, square_proto);
+		auto& s = reg.emplace<Shape>(entity, prototypes[ShapePrototypes::Square]);
 		s.color = spawn.color;
 
 		s.MoveTo(spawn.position);
@@ -585,7 +624,8 @@ struct GameplayState : public State {
 		
 		score = 0.0f;
 		player_entity = reg.create();
-		auto& s = reg.emplace<Shape>(player_entity, square_proto);
+		reg.emplace<PlayerComponent>(player_entity);
+		auto& s = reg.emplace<Shape>(player_entity, prototypes[ShapePrototypes::Square]);
 		s.MoveTo(pge->GetScreenSize() / 2.0f);
 		reg.emplace<PhysicsComponent>(player_entity);
 		
@@ -596,6 +636,7 @@ struct GameplayState : public State {
 		spawn_enemy_system = std::make_unique<EnemySpawnSystem>(dispatcher, reg, pge);
 		bullet_system = std::make_unique<BulletSystem>(dispatcher, reg, pge);
 		particle_system = std::make_unique<ParticleSystem>(reg, pge);
+		enemy_attack_system = std::make_unique<EnemyAttackSystem>(player_entity, reg, pge);
 	}
 
 	GameState OnUserUpdate(float fElapsedTime) override {
@@ -606,11 +647,14 @@ struct GameplayState : public State {
 		spawn_enemy_system->PreUpdate();
 		bullet_system->PreUpdate();
 		particle_system->PreUpdate();
+		enemy_attack_system->PreUpdate();
 
 		dispatcher.update();
 
 		enemy_movement_system->OnUserUpdate(fElapsedTime);
-		physics_system->OnUserUpdate(fElapsedTime);
+		enemy_attack_system->OnUserUpdate(fElapsedTime);
+		physics_system->OnUserUpdate(fElapsedTime/2.0f);
+		physics_system->OnUserUpdate(fElapsedTime/2.0f);
 		draw_system->OnUserUpdate(fElapsedTime);
 		input_system->OnUserUpdate(fElapsedTime);
 		spawn_enemy_system->OnUserUpdate(fElapsedTime);
@@ -624,6 +668,7 @@ struct GameplayState : public State {
 		{
 			pge->DrawStringDecal({10.0f, 10.0f}, std::format("Score: {}", score), olc::WHITE, olc::vf2d{3.0f, 3.0f});
 			pge->DrawStringDecal({10.0f, 40.0f}, std::format("Timer: {}", fTotalTime), olc::WHITE, olc::vf2d{3.0f, 3.0f});
+			pge->DrawStringDecal({10.0f, 70.0f}, std::format("Timer: {}", reg.get<PlayerComponent>(player_entity).health), olc::WHITE, olc::vf2d{3.0f, 3.0f});
 			// pge->DrawStringDecal({10.0f, 70.0f}, std::format("Enemy: {}", enemyTimer), olc::WHITE, olc::vf2d{3.0f, 3.0f});
 			// pge->DrawStringDecal({10.0f, 100.0f}, std::format("Power: {}", 1 + std::powf(2, fTotalTime / 40.0f)), olc::WHITE, olc::vf2d{3.0f, 3.0f});
 		}
@@ -631,15 +676,14 @@ struct GameplayState : public State {
 	}
 };
 
+
+
 class Jam2025Shapes : public olc::PixelGameEngine
 {
 public:
 	std::unique_ptr<Shape> player;
 	std::unique_ptr<Shape> cursor;
 	std::unique_ptr<Shape> test_shape;
-
-	Prototype square_proto;
-	Prototype cursor_proto;
 
 	float fTotalTime {0.0f};
 	float enemyTimer {0.0f};
@@ -665,6 +709,22 @@ public:
 	{
 		game_states.insert(std::make_pair(GameState::Menu, std::make_unique<MenuState>(this)));
 		game_states.insert(std::make_pair(GameState::Gameplay, std::make_unique<GameplayState>(this)));
+
+		// Generate the prototypes
+		Prototype triangle_proto;
+		triangle_proto.tris.push_back(olc::utils::geom2d::triangle<float>{{0, -8}, {8, 8}, {-8, 8}});
+		prototypes.insert({ShapePrototypes::Triangle, triangle_proto});
+
+		Prototype square_proto;
+		square_proto.tris.push_back(olc::utils::geom2d::triangle<float>{{-8, -8}, {8, -8}, {-8, 8}});
+		square_proto.tris.push_back(olc::utils::geom2d::triangle<float>{{8, -8}, {8, 8}, {-8, 8}});
+		prototypes.insert({ShapePrototypes::Square, square_proto});
+		
+		// Create the cursor shape
+		Prototype cursor_proto;
+		cursor_proto.tris.push_back(olc::utils::geom2d::triangle<float>{{0, -8}, {8, 8}, {0, 0}});
+		cursor_proto.tris.push_back(olc::utils::geom2d::triangle<float>{{0, -8}, {0, 0}, {-8, 8}});
+		prototypes.insert({ShapePrototypes::Cursor, cursor_proto});
 
 		return true;
 	}
