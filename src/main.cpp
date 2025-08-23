@@ -149,6 +149,12 @@ olc::vi2d print(olc::utils::geom2d::triangle<float>& tri, olc::vi2d pos, olc::Pi
 	return pos;
 };
 
+struct PlayerInput {
+	olc::vf2d move_direction {};
+	olc::vf2d aim_direction {};
+	bool fire {false};
+};
+
 using Velocity = olc::vf2d;
 
 struct EnemyComponent {
@@ -165,11 +171,107 @@ struct BulletComponent {
 	float angular_velocity {14.0};
 };
 
+struct PhysicsComponent {
+	olc::vf2d velocity {};
+	olc::vf2d acceleration {};
+	olc::vf2d force {};
+	float mass {1.0f};
+	float friction {0.95f};
+	float anular_velocity {0.0f};
+};
+
 enum class GameState {
 	Unknown,
 	Menu,
 	Gameplay
 };
+
+struct System {
+	System(entt::registry& reg, olc::PixelGameEngine* pge) : reg(reg), pge(pge) {};
+
+	// Run before any OnUserUpdate functions.  Possibly to reset per-frame data
+	virtual void PreUpdate() {};
+
+	// Run once per tick
+	virtual void OnUserUpdate(float fElapsedTime) = 0;
+
+	virtual ~System() {};
+protected:
+	entt::registry& reg;
+	olc::PixelGameEngine* pge;
+};
+
+struct PhysicsSystem : public System {
+	PhysicsSystem(entt::registry& reg, olc::PixelGameEngine* pge) : System(reg, pge) {};
+
+	void PreUpdate() override {
+		const auto& view = reg.view<PhysicsComponent>();
+
+		for(auto entity : view) {
+			auto& physics = view.get<PhysicsComponent>(entity);
+			if(physics.force.mag2() > 0) {
+				physics.acceleration *=  0.8f;
+				physics.velocity *= physics.friction;
+			} else {
+				physics.acceleration *=  0.4f;
+				physics.velocity *= physics.friction * physics.friction;
+			}
+
+			physics.force = {0.0f, 0.0f};
+		}
+	}
+
+	void OnUserUpdate(float fElapsedTime) override {
+		const auto& view = reg.view<PhysicsComponent, Shape>();
+
+		for(auto entity : view) {
+			auto& physics = view.get<PhysicsComponent>(entity);
+			auto& shape = view.get<Shape>(entity);
+
+			physics.acceleration += physics.force * fElapsedTime;
+			physics.velocity += physics.acceleration * fElapsedTime;
+
+			shape.MoveTo(shape.position + physics.velocity * fElapsedTime);
+		}
+	}
+};
+
+struct EnemyMovementSystem : public System {
+	EnemyMovementSystem(entt::entity player, entt::registry& reg, olc::PixelGameEngine* pge) : player_entity(player), System(reg, pge) {};
+
+	void PreUpdate() override {
+		// const auto& view = reg.view<PhysicsComponent>();
+
+		// for(auto entity : view) {
+		// 	auto& physics = view.get<PhysicsComponent>(entity);
+		// 	if(physics.force.mag2() > 0) {
+		// 		physics.acceleration *=  0.8f;
+		// 		physics.velocity *= physics.friction;
+		// 	} else {
+		// 		physics.acceleration *=  0.4f;
+		// 		physics.velocity *= physics.friction * physics.friction;
+		// 	}
+
+		// 	physics.force = {0.0f, 0.0f};
+		// }
+	}
+
+	void OnUserUpdate(float fElapsedTime) override {
+		const auto& view = reg.view<PhysicsComponent, Shape, EnemyComponent>();
+		const auto& player_position = reg.get<Shape>(player_entity).position;
+
+		for(auto entity : view) {
+			auto& physics = view.get<PhysicsComponent>(entity);
+			const auto& s = reg.get<Shape>(entity);
+			const auto& dir = player_position - s.position;
+
+			physics.force += dir.norm() * 4500.0f;
+		}
+	}
+private:
+	entt::entity player_entity;
+};
+
 
 struct State {
 	olc::PixelGameEngine* pge;
@@ -195,17 +297,20 @@ struct MenuState : public State {
 	}
 };
 
+
+
 struct GameplayState : public State {
-	std::unique_ptr<Shape> player;
-	//std::unique_ptr<Shape> cursor;
-	//std::unique_ptr<Shape> test_shape;
+	//std::unique_ptr<Shape> player;
+	entt::entity player_entity;
+
 	Prototype square_proto;
 	Prototype cursor_proto;
 
 	float fTotalTime {0.0f};
 	float enemyTimer {0.0f};
 	float player_health {10.0f};
-	float player_speed {80.0f};
+	float enemy_speed {100.0f};
+	float player_speed {120.0f};
 	float enemy_threshold {10.0f};
 	float enemy_cost {10.0f};
 	float score {0.0f};
@@ -216,6 +321,9 @@ struct GameplayState : public State {
 	std::mt19937_64 rng;
 
 	struct enemy_death{};
+
+	std::unique_ptr<System> physics_system;
+	std::unique_ptr<System> enemy_movement_system;
 
 	explicit GameplayState(olc::PixelGameEngine* pge) : State(pge) {
 		// Create the square
@@ -242,6 +350,7 @@ struct GameplayState : public State {
 
 		s.MoveTo(position);
 		reg.emplace<EnemyComponent>(entity);
+		reg.emplace<PhysicsComponent>(entity);
 	}
 
 	void spawnBullet(olc::vf2d pos, olc::vf2d vel) {
@@ -250,25 +359,89 @@ struct GameplayState : public State {
 		s.MoveTo(pos);
 		s.scale = 0.3f;
 		auto& b = reg.emplace<BulletComponent>(entity, vel);
-
+		auto& p = reg.emplace<PhysicsComponent>(entity);
+		p.force = vel.norm() * 300000.0f;
+		p.friction = 1.0;
 	}
 
+	// Event responding to an enemy death
 	void on_enemy_death(const enemy_death& e) {
 		score += 1.0f;
 	}
 
+	// Event responding to certain player input
+	void on_player_input(const PlayerInput& input) {
+		const auto& s = reg.get<Shape>(player_entity);
+		auto& p = reg.get<PhysicsComponent>(player_entity);
+
+		p.force = input.move_direction * 5000.0f;
+
+		if(input.fire) {
+			spawnBullet(s.position, input.aim_direction * player_speed);
+		}
+	}
+
 	void EnterState() override {
 		dispatcher.sink<enemy_death>().connect<&GameplayState::on_enemy_death>(this);
+		dispatcher.sink<PlayerInput>().connect<&GameplayState::on_player_input>(this);
 		
 		score = 0.0f;
-		player = std::make_unique<Shape>(square_proto);
-		player->MoveTo(pge->GetScreenSize() / 2.0f);
+		player_entity = reg.create();
+		auto& s = reg.emplace<Shape>(player_entity, square_proto);
+		s.MoveTo(pge->GetScreenSize() / 2.0f);
+		reg.emplace<PhysicsComponent>(player_entity);
+		
+		physics_system = std::make_unique<PhysicsSystem>(reg, pge);
+		enemy_movement_system = std::make_unique<EnemyMovementSystem>(player_entity, reg, pge);
+		//player = std::make_unique<Shape>(square_proto);
+		//player->MoveTo(pge->GetScreenSize() / 2.0f);
 	}
 
 	GameState OnUserUpdate(float fElapsedTime) override {
+		physics_system->PreUpdate();
+		enemy_movement_system->PreUpdate();
+
+		{
+			// Process Inputs and dispatch the PlayerInput message
+			olc::vf2d input {};
+			float speed = 40.0f;
+			if(pge->GetKey(olc::Key::W).bHeld) {
+				input.y += -player_speed;
+			}
+			if(pge->GetKey(olc::Key::S).bHeld) {
+				input.y += player_speed;
+			}
+			if(pge->GetKey(olc::Key::A).bHeld) {
+				input.x += -player_speed;
+			}
+			if(pge->GetKey(olc::Key::D).bHeld) {
+				input.x += player_speed;
+			}
+
+			if(input.x != 0.0f || input.y != 0.0f) {
+				input = input.norm();
+			}
+
+			const auto& s = reg.get<Shape>(player_entity);
+			olc::vf2d ray = (pge->GetMousePos() - s.position).norm();
+			PlayerInput player_input;
+			player_input.move_direction = input;
+			player_input.aim_direction = ray;
+
+			if(pge->GetMouse(0).bPressed) {
+				player_input.fire = true;
+			}
+
+			dispatcher.enqueue<PlayerInput>(player_input);
+		}
+
 		dispatcher.update();
+
+		enemy_movement_system->OnUserUpdate(fElapsedTime);
+		physics_system->OnUserUpdate(fElapsedTime);
+
 		fTotalTime += fElapsedTime;
-		enemyTimer += fElapsedTime * (1 + std::powf(2, fTotalTime / 30.0f));
+		enemyTimer += fElapsedTime * (1 + std::powf(2, fTotalTime / 40.0f));
 
 		while (enemyTimer > enemy_threshold) {
 			enemyTimer -= enemy_threshold;
@@ -301,18 +474,18 @@ struct GameplayState : public State {
 			input = input.norm() * player_speed;
 		}
 		
-		player->theta += fElapsedTime;
-		player->MoveTo(player->position + input * fElapsedTime);
+		//player->theta += fElapsedTime;
+		//player->MoveTo(player->position + input * fElapsedTime);
 
 		// Get the path from the player to the cursor and rotate the cursor
-		olc::vf2d ray = (pge->GetMousePos() - player->position).norm();
+		//olc::vf2d ray = (pge->GetMousePos() - player->position).norm();
 		//cursor->theta = ray.polar().y + (olc::utils::geom2d::pi / 2.0f);
 
 
 		// Shoot a projectile on Left Click
-		if(pge->GetMouse(0).bPressed) {
-			spawnBullet(player->position, ray*player_speed);
-		}
+		// if(pge->GetMouse(0).bPressed) {
+		// 	spawnBullet(player->position, ray*player_speed);
+		// }
 
 		// if(cursor->intersects(*player)) {
 		// 	cursor->color = olc::RED;
@@ -324,30 +497,33 @@ struct GameplayState : public State {
 
 		//cursor->Draw(this);
 		//test_shape->Draw(this);
-		player->Draw(pge);
+		//player->Draw(pge);
+		const auto& s = reg.get<Shape>(player_entity);
+		s.Draw(pge);
 
-		{
-			// Move bullets around
-			const auto view = reg.view<BulletComponent, Shape>();
-			for(const auto e : view) {
-				auto& s = reg.get<Shape>(e);
-				auto& b = reg.get<BulletComponent>(e);
-				s.theta += b.angular_velocity * fElapsedTime;
-				s.MoveTo(s.position + b.velocity * fElapsedTime);
-			}
-		}
+		// {
+		// 	// Move bullets around
+		// 	const auto view = reg.view<BulletComponent, Shape>();
+		// 	for(const auto e : view) {
+		// 		auto& s = reg.get<Shape>(e);
+		// 		auto& b = reg.get<BulletComponent>(e);
+		// 		s.theta += b.angular_velocity * fElapsedTime;
+		// 		s.MoveTo(s.position + b.velocity * fElapsedTime);
+		// 	}
+		// }
 
 		{
 			// Move Enemies
-			const auto view = reg.view<EnemyComponent, Shape>();
-			const auto& player_position = player->position;
-			for(const auto entity : view) {
-				auto [e, s] = view.get(entity);
+			// const auto& s = reg.get<Shape>(player_entity);
+			// const auto view = reg.view<EnemyComponent, Shape>();
+			// const auto& player_position = s.position;
+			// for(const auto entity : view) {
+			// 	auto [e, s] = view.get(entity);
 
-				olc::vf2d direction = player_position - s.position;
-				olc::vf2d velocity = direction.norm() * player_speed;
-				s.MoveTo(s.position + velocity * fElapsedTime);
-			}
+			// 	olc::vf2d direction = player_position - s.position;
+			// 	olc::vf2d velocity = direction.norm() * player_speed;
+			// 	s.MoveTo(s.position + velocity * fElapsedTime);
+			// }
 		}
 
 		{
@@ -368,7 +544,7 @@ struct GameplayState : public State {
 
 						if(e.health <= 0) {
 							reg.destroy(e_entity);
-							enemy_threshold *= 0.9f;
+							//enemy_threshold *= 0.9f;
 							dispatcher.enqueue<enemy_death>(enemy_death{});
 						}
 
@@ -415,6 +591,9 @@ struct GameplayState : public State {
 
 		{
 			pge->DrawStringDecal({10.0f, 10.0f}, std::format("Score: {}", score), olc::WHITE, olc::vf2d{3.0f, 3.0f});
+			pge->DrawStringDecal({10.0f, 40.0f}, std::format("Timer: {}", fTotalTime), olc::WHITE, olc::vf2d{3.0f, 3.0f});
+			pge->DrawStringDecal({10.0f, 70.0f}, std::format("Enemy: {}", enemyTimer), olc::WHITE, olc::vf2d{3.0f, 3.0f});
+			pge->DrawStringDecal({10.0f, 100.0f}, std::format("Power: {}", 1 + std::powf(2, fTotalTime / 40.0f)), olc::WHITE, olc::vf2d{3.0f, 3.0f});
 		}
 		return GameState::Gameplay;
 	}
@@ -423,10 +602,6 @@ struct GameplayState : public State {
 class Jam2025Shapes : public olc::PixelGameEngine
 {
 public:
-	//Square test_square;
-
-	//std::vector<std::unique_ptr<Enemy>> enemies;
-	// std::vector<std::unique_ptr<Bullet>> bullets;
 	std::unique_ptr<Shape> player;
 	std::unique_ptr<Shape> cursor;
 	std::unique_ptr<Shape> test_shape;
@@ -459,40 +634,8 @@ public:
 		game_states.insert(std::make_pair(GameState::Menu, std::make_unique<MenuState>(this)));
 		game_states.insert(std::make_pair(GameState::Gameplay, std::make_unique<GameplayState>(this)));
 
-		//gameplay.OnEnterState();
 		return true;
 	}
-
-	// void DebugDraw() {
-	// 	DrawString({0,0}, GetMousePos().str());
-	// 	DrawString({0,10}, player->position.str());
-	// 	DrawString({0,20}, std::to_string(cursor->theta));
-	// 	olc::vi2d p {0, 30};
-	// 	for(auto& t : *test_shape) {
-	// 		p = print(t, p, this);
-	// 	}
-	// }
-
-	// void tickEnemyTimer() {
-	// 	auto entity = reg.create();
-	// 	auto& s = reg.emplace<Shape>(entity, square_proto);
-	// 	s.color = olc::YELLOW;
-
-	// 	int x = rand() % ScreenWidth();
-	// 	int y = rand() % ScreenHeight();
-
-	// 	s.MoveTo({x, y});
-	// 	reg.emplace<EnemyComponent>(entity);
-	// }
-
-	// void spawnBullet(olc::vf2d pos, olc::vf2d vel) {
-	// 	auto entity = reg.create();
-	// 	auto& s = reg.emplace<Shape>(entity, square_proto);
-	// 	s.MoveTo(pos);
-	// 	s.scale = 0.3f;
-	// 	auto& b = reg.emplace<BulletComponent>(entity, vel);
-
-	// }
 
 
 	bool OnUserUpdate(float fElapsedTime) override
@@ -521,7 +664,7 @@ public:
 int main()
 {
 	Jam2025Shapes demo;
-	if (demo.Construct(1920, 1080, 1, 1, false, true))
+	if (demo.Construct(1280, 960, 1, 1, false, true))
 		demo.Start();
 
 	return 0;
