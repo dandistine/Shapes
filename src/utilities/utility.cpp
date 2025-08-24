@@ -10,4 +10,8 @@ namespace utilities
         return (x & 0xFF00) | ((y & 0xFF00) >> 8);
     }
 
+    olc::Pixel RandomColor()
+    {
+        return olc::Pixel(rand() % 256, rand() % 256, rand() % 256);
+    }
 }

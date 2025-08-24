@@ -87,8 +87,10 @@ namespace utilities
         return distance;
     }
 
-    template<typename T>
-    olc::v_2d<T> relativeScreenPosition(olc::v_2d<T> screen_center) {
-
+    template<typename T = float>
+    olc::v_2d<T> rotate(const olc::v_2d<T>& p, const olc::v_2d<T>& sc) {
+        return olc::v_2d<T>{p.x * sc.y - p.y * sc.x, p.x * sc.x + p.y * sc.y};
     }
+
+    olc::Pixel RandomColor();
 }

@@ -16,6 +16,9 @@ find_package(tinyxml2 CONFIG REQUIRED)
 add_executable (${CMAKE_PROJECT_NAME} 
     src/main.cpp
     src/olcPixelGameEngine.cpp
+    src/shape.cpp
+    src/weapon.cpp
+    src/utilities/utility.cpp
 )
 
 target_include_directories(${CMAKE_PROJECT_NAME}
