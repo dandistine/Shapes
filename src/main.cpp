@@ -47,6 +47,7 @@ struct Prototype {
 	}
 
 	std::vector<olc::utils::geom2d::triangle<float>> tris;
+	std::vector<olc::vf2d> weapon_points;
 };
 
 enum class ShapePrototypes {
@@ -61,6 +62,9 @@ enum class ShapePrototypes {
 	Star9_3
 };
 
+// Players start as a triangle with 3 weapon slots and gain one slot per progression until 9
+std::array shape_progression {ShapePrototypes::Triangle, ShapePrototypes::Square, ShapePrototypes::Pentagon, ShapePrototypes::Star6_2, ShapePrototypes::Star7_3, ShapePrototypes::Star8_2, ShapePrototypes::Star9_3};
+
 olc::Pixel RandomColor()
 {
 	return olc::Pixel(rand() % 256, rand() % 256, rand() % 256);
@@ -72,7 +76,21 @@ struct Shape {
 	using iterator = std::vector<olc::utils::geom2d::triangle<float>>::iterator;
 	using const_iterator = std::vector<olc::utils::geom2d::triangle<float>>::const_iterator;
 
-	Shape(const Prototype& other) : tris(other.tris), prototype(other) { }
+	Shape(const Prototype& other) : tris(other.tris), prototype(&other) { }
+	
+	// Shape(const Shape& other, const Prototype& new_proto) : tris(new_proto.tris), prototype(&new_proto) {
+	// 	scale = other.scale;
+	// 	theta = other.theta;
+	// 	position = other.position;
+	// 	color = other.color;
+	// }
+
+	// Shape(const Shape& other) : tris(other.tris), prototype(other.prototype) {
+	// 	scale = other.scale;
+	// 	theta = other.theta;
+	// 	position = other.position;
+	// 	color = other.color;
+	// }
 
 	iterator begin() {
 		return tris.begin();
@@ -90,11 +108,20 @@ struct Shape {
 		return tris.cend();
 	}
 
+	void SetPrototype(const Prototype& proto) {
+		prototype = &proto;
+	}
+
 	void Draw(olc::PixelGameEngine* pge) const {
 		for (const auto& t : tris) {
 			pge->FillTriangleDecal(t.pos[0], t.pos[1], t.pos[2], color);
 		}
     }
+
+	// Scale, Rotate, and Translate a point from shape-space to world-space.  Rotation vector must be provided separately
+	olc::vf2d Translate(olc::vf2d pos, const olc::vf2d& sc) const {
+		return rotate(pos, sc) * scale + position;
+	}
 
 	void MoveTo(olc::vf2d new_position) {
 		position = new_position;
@@ -103,14 +130,21 @@ struct Shape {
 		//const float c = std::cos(theta);
 		tris.clear();
 
-		for(const auto& t : prototype) {
+		for(const auto& t : *prototype) {
 			tris.push_back(
 				{
-					(rotate(t.pos[0], sc) * scale) + position,
-				 	(rotate(t.pos[1], sc) * scale) + position,
-				 	(rotate(t.pos[2], sc) * scale) + position
+					Translate(t.pos[0], sc),
+					Translate(t.pos[1], sc),
+					Translate(t.pos[2], sc),
 				}
 			);
+			// tris.push_back(
+			// 	{
+			// 		(rotate(t.pos[0], sc) * scale) + position,
+			// 	 	(rotate(t.pos[1], sc) * scale) + position,
+			// 	 	(rotate(t.pos[2], sc) * scale) + position
+			// 	}
+			// );
 		}
 	}
 
@@ -126,7 +160,18 @@ struct Shape {
 		return false;
 	};
 
+	const std::vector<olc::vf2d>& WeaponPoints() {
+		const auto sc = olc::vf2d{std::sinf(theta), std::cosf(theta)};
+		weapon_points.clear();
+		for(auto p : prototype->weapon_points) {
+			weapon_points.push_back(Translate(p, sc));
+		}
+		return weapon_points;
+	}
 
+	size_t WeaponPointCount() const {
+		return prototype->weapon_points.size();
+	}
 
 	float scale {1.0f};
 	float theta {0.0f};
@@ -136,7 +181,8 @@ struct Shape {
 	virtual ~Shape() = default;
 protected:
 	std::vector<olc::utils::geom2d::triangle<float>> tris;
-	const Prototype& prototype;
+	std::vector<olc::vf2d> weapon_points;
+	const Prototype* prototype;
 };
 
 struct Enemy : public Shape {
@@ -227,7 +273,6 @@ struct EnemyComponent {
 
 
 struct Weapon {
-
 	Weapon(entt::registry& reg, entt::dispatcher& dispatcher) : reg(reg), dispatcher(dispatcher) {
 		dispatcher.sink<PlayerInput>().connect<&Weapon::on_player_input>(this);
 	}
@@ -267,12 +312,16 @@ struct Weapon {
 		accumulated_power += fElapsedTime;
 
 		while(accumulated_power > fire_cost) {
+			float angle = aim_direction.polar().y;
+			utilities::random::uniform_real_distribution<float> dist{-aim_variance, aim_variance};
+			angle += dist(rng);
+
 			SpawnBullet spawn;
 			spawn.angular_velocity = 14.0f;
 			spawn.damage = damage;
 			spawn.duration = 10.0f;
 			spawn.hit_count = 1;
-			spawn.initial_velocity = aim_direction.norm() * 250.0f;
+			spawn.initial_velocity = olc::vf2d{1.0f, angle}.cart() * 250.0f;
 			spawn.position = position;
 			spawn.scale = 0.4f;
 			spawn.shape = bullet_shape;
@@ -294,11 +343,15 @@ struct Weapon {
 	void SetPosition(olc::vf2d pos) {
 		position = pos;
 	}
+
+	ShapePrototypes Shape() const {
+		return bullet_shape;
+	}
 	
 private:
 	int projectile_count {1};
 	int level {1};
-	float aim_variance {0.02};
+	float aim_variance {0.2};
 	float damage {10.0f};
 	ShapePrototypes bullet_shape {ShapePrototypes::Square};
 
@@ -310,6 +363,7 @@ private:
 	olc::vf2d position;
 	entt::registry& reg;
 	entt::dispatcher& dispatcher;
+	std::mt19937_64 rng{std::random_device{}()};
 };
 
 struct PlayerComponent {
@@ -343,7 +397,11 @@ struct PhysicsComponent {
 };
 
 struct ParticleComponent {
+	// How long in seconds that particle should stay around
 	float lifespan {1.0f};
+
+	// Particle fades to alpha when lifespan is below this
+	float fade_begin {1.0f};
 };
 
 struct ExperienceComponent {
@@ -468,8 +526,9 @@ struct ParticleSystem : public System {
 
 			if(p.lifespan <= 0.0f) {
 				reg.destroy(entity);
-			} else {
-				s.color.a = static_cast<uint8_t>(255 * p.lifespan);
+			} else if (p.lifespan <= p.fade_begin) {
+				float alpha = 1.0f - ((p.fade_begin - p.lifespan) / p.fade_begin);
+				s.color.a = static_cast<uint8_t>(255 * alpha);
 			}
 		}
 	}
@@ -628,12 +687,17 @@ struct PlayerWeaponSystem : public System {
 	void OnUserUpdate(float fElapsedTime) override {
 		auto& p = reg.get<PlayerComponent>(player_entity);
 		auto& s = reg.get<Shape>(player_entity);
+		const auto& wp = s.WeaponPoints();
 
-
-		for(auto& w : p.weapons) {
-			w.SetPosition(s.position);
-			w.OnUserUpdate(fElapsedTime);
+		for(int i = 0; i < p.weapons.size(); i++) {
+			p.weapons[i].SetPosition(wp[i]);
+			p.weapons[i].OnUserUpdate(fElapsedTime);
 		}
+
+		// for(auto& w : p.weapons) {
+		// 	w.SetPosition(s.position);
+		// 	w.OnUserUpdate(fElapsedTime);
+		// }
 	}
 private:
 	entt::entity player_entity;
@@ -649,22 +713,23 @@ struct ExperienceSystem : public System {
 		auto& player_component = reg.get<PlayerComponent>(player_entity);
 		auto view = reg.view<ExperienceComponent, Shape, PhysicsComponent>();
 
-		// If the player is touching an experience, pick it up
+		float xp_range2 = player_component.experience_range * player_component.experience_range;
 		for(auto entity : view) {
 			const auto& s = view.get<Shape>(entity);
+			auto& e = view.get<ExperienceComponent>(entity);
+			auto& p = view.get<PhysicsComponent>(entity);
+			
+			e.age += fElapsedTime;
+			
+			// If the player is touching an experience, pick it up
 			if(s.intersects(player_shape)) {
 				const auto& xp = view.get<ExperienceComponent>(entity);
 				player_component.experience += xp.value;
 				reg.destroy(entity);
+				continue;
 			}
-		}
 
-		float xp_range2 = player_component.experience_range * player_component.experience_range;
-		// If the player is somewhat close to an experience, pull it in
-		for(auto entity : view) {
-			const auto& s = view.get<Shape>(entity);
-			auto& p = view.get<PhysicsComponent>(entity);
-
+			// If the player is somewhat close to an experience, pull it in
 			olc::vf2d distance = s.position - player_shape.position;
 			float mag2 = distance.mag2();
 			if(mag2 < xp_range2) {
@@ -694,12 +759,13 @@ struct LevelUpPickSystem : public System {
 		//          Improve base in some way
 		//          limited choice count
 		const auto& p = reg.get<PlayerComponent>(player_entity);
+		const auto& ps = reg.get<Shape>(player_entity);
 
 		// Clear the old options from the system
 		options.clear();
 
 		// If the player has an open weapon slot, all three choices should be a random weapon
-		if(p.weapons.size() < p.max_weapon_count) {
+		if(p.weapons.size() < ps.WeaponPointCount()) {
 			std::string description = "Add a weapon";
 			auto functor = [&](entt::registry& reg, entt::entity e) {
 				auto& p = reg.get<PlayerComponent>(e);
@@ -712,11 +778,16 @@ struct LevelUpPickSystem : public System {
 			return;
 		}
 
-		if(p.max_weapon_count < 9) {
-			std::string description = "Add a weapon slot";
+		if((ps.WeaponPointCount() - 2) < shape_progression.size()) {
+			std::string description = "Upgrade Core";
 			auto functor = [](entt::registry& reg, entt::entity e) {
 				auto& p = reg.get<PlayerComponent>(e);
-				p.max_weapon_count += 1;
+				auto& s = reg.get<Shape>(e);
+				auto& next_shape = prototypes[shape_progression[s.WeaponPoints().size() - 2]];
+				s.SetPrototype(next_shape);
+				//reg.erase<Shape>(e);
+				//reg.emplace<Shape>(e, s, next_shape);
+				//p.max_weapon_count += 1;
 			};
 
 			options.emplace_back(LevelUpOption{description, functor});
@@ -730,6 +801,7 @@ struct LevelUpPickSystem : public System {
 				auto& p = reg.get<PlayerComponent>(e);
 				p.weapons[weapon_slot].LevelUp(1);
 			};
+			options.emplace_back(LevelUpOption{description, functor});
 		}
 	}
 
@@ -959,6 +1031,7 @@ struct GameplayState : public State {
 		s.color.b = rand() % 128;
 		s.color.r = rand() % 128;
 
+		reg.emplace<ParticleComponent>(entity, 30.0f, 20.0f);
 		reg.emplace<ExperienceComponent>(entity, spawn.value, spawn.age);
 	}
 
@@ -987,7 +1060,7 @@ struct GameplayState : public State {
 		player_entity = reg.create();
 		auto& p = reg.emplace<PlayerComponent>(player_entity);
 		p.weapons.emplace_back(reg, dispatcher);
-		auto& s = reg.emplace<Shape>(player_entity, prototypes[ShapePrototypes::Star7_3]);
+		auto& s = reg.emplace<Shape>(player_entity, prototypes[ShapePrototypes::Triangle]);
 		s.MoveTo(pge->GetScreenSize() / 2.0f);
 		s.scale = 4.0f;
 		reg.emplace<PhysicsComponent>(player_entity);
@@ -1008,6 +1081,9 @@ struct GameplayState : public State {
 	}
 
 	GameState OnUserUpdate(float fElapsedTime) override {
+		if(fElapsedTime > 1.0f/60.0f) {
+			fElapsedTime = 1.0f/60.0f;
+		}
 		if(next_state != current_state) {
 			previous_state = current_state;
 			current_state = next_state;
@@ -1123,6 +1199,7 @@ public:
 		Prototype cursor_proto;
 		cursor_proto.tris.push_back(olc::utils::geom2d::triangle<float>{{0, -8}, {8, 8}, {0, 0}});
 		cursor_proto.tris.push_back(olc::utils::geom2d::triangle<float>{{0, -8}, {0, 0}, {-8, 8}});
+		// Cursor proto has no weapon points as it is only used for projectiles
 		prototypes.insert({ShapePrototypes::Cursor, cursor_proto});
 
 		// Create the star52 shape and the pentagon shape
@@ -1130,13 +1207,14 @@ public:
 		Prototype pentagon_proto;
 		{
 			std::array<olc::vf2d, 5> outer_points;
-			std::array<olc::vf2d, 5> inner_points;
 
 			for(int i = 0; i < 5; i++) {
 				float outer_angle = ((90.0f - (72.0f * i)) * olc::utils::geom2d::pi) / 180.0f;
-				//float inner_angle = ((54.0f - (72.0f * i)) * olc::utils::geom2d::pi) / 180.0f;
 				outer_points[i] = olc::vf2d{-8.0f * std::cosf(outer_angle), -8.0f * std::sinf(outer_angle)};
-				//inner_points[i] = olc::vf2d{std::cosf(inner_angle), std::sinf(inner_angle)};
+
+				// Both the pentagon and star52 shapes have the same weapon mount points
+				star52_proto.weapon_points.push_back(outer_points[i]);
+				pentagon_proto.weapon_points.push_back(outer_points[i]);
 			}
 
 			star52_proto.tris.push_back(olc::utils::geom2d::triangle<float>{{outer_points[0]}, {outer_points[2]}, {0.0f, 0.0f}});
@@ -1163,6 +1241,12 @@ public:
 			for(int i = 0; i < 6; i++) {
 				float angle = ((90.0f - (60.0f * i)) * olc::utils::geom2d::pi) / 180.0f;
 				points[i] = olc::vf2d{-8.0f * std::cosf(angle), -8.0f * std::sinf(angle)};
+
+				// Add the weapon points, but only half to the triangle
+				star62_proto.weapon_points.push_back(points[i]);
+				if((i % 2) == 0) {
+					triangle_proto.weapon_points.push_back(points[i]);
+				}
 			}
 
 			star62_proto.tris.push_back(olc::utils::geom2d::triangle<float>{points[0], points[2], points[4]});
@@ -1182,6 +1266,11 @@ public:
 			for(int i = 0; i < 8; i++) {
 				float angle = ((90.0f - (45.0f * i)) * olc::utils::geom2d::pi) / 180.0f;
 				points[i] = olc::vf2d{-8.0f * std::cosf(angle), -8.0f * std::sinf(angle)};
+
+				star82_proto.weapon_points.push_back(points[i]);
+				if((i % 2) == 1) {
+					square_proto.weapon_points.push_back(points[i]);
+				}
 			}
 
 			star82_proto.tris.push_back(olc::utils::geom2d::triangle<float>{points[0], points[2], points[4]});
@@ -1203,6 +1292,8 @@ public:
 			for(int i = 0; i < 9; i++) {
 				float angle = ((90.0f - (40.0f * i)) * olc::utils::geom2d::pi) / 180.0f;
 				points[i] = olc::vf2d{-8.0f * std::cosf(angle), -8.0f * std::sinf(angle)};
+
+				star93_proto.weapon_points.push_back(points[i]);
 			}
 
 			star93_proto.tris.push_back(olc::utils::geom2d::triangle<float>{points[0], points[3], points[6]});
@@ -1218,6 +1309,8 @@ public:
 			for(int i = 0; i < 7; i++) {
 				float angle = ((90.0f - ((360.0f/7.0f) * i)) * olc::utils::geom2d::pi) / 180.0f;
 				points[i] = olc::vf2d{-8.0f * std::cosf(angle), -8.0f * std::sinf(angle)};
+
+				star73_proto.weapon_points.push_back(points[i]);
 			}
 
 			star73_proto.tris.push_back(olc::utils::geom2d::triangle<float>(points[0], points[3], {0.0f, 0.0f}));
