@@ -171,7 +171,27 @@ struct SpawnEnemy {
 };
 
 struct EnemyDeath {
+	// Where the enemy died
 	olc::vf2d position;
+};
+
+struct SpawnBullet {
+	// Where the bullet spawns
+	olc::vf2d position;
+	// Initial velocity
+	olc::vf2d initial_velocity;
+	// How many enemies the bullet can hit before being removed
+	int hit_count;
+	// base damage dealt
+	float damage;
+	// how long the bullet survives before being removed
+	float duration;
+	// how quickly the bullet spins
+	float angular_velocity;
+	//how big the bullet is
+	float scale;
+	// bullet shape
+	ShapePrototypes shape;
 };
 
 // Components
@@ -185,12 +205,76 @@ struct EnemyComponent {
 	olc::vf2d velocity {0.0f, 0.0f};
 };
 
+
+struct Weapon {
+
+	Weapon(entt::registry& reg, entt::dispatcher& dispatcher) : reg(reg), dispatcher(dispatcher) {
+		dispatcher.sink<PlayerInput>().connect<&Weapon::on_player_input>(this);
+	}
+
+	void on_player_input(const PlayerInput& input) {
+		aim_direction = input.aim_direction;
+	}
+
+	virtual void OnUserUpdate(float fElapsedTime) {
+		accumulated_power += fElapsedTime;
+
+		while(accumulated_power > fire_cost) {
+			SpawnBullet spawn;
+			spawn.angular_velocity = 14.0f;
+			spawn.damage = damage;
+			spawn.duration = 10.0f;
+			spawn.hit_count = 1;
+			spawn.initial_velocity = aim_direction.norm() * 250.0f;
+			spawn.position = position;
+			spawn.scale = 0.4f;
+			spawn.shape = bullet_shape;
+
+			//std::cout << position << std::endl;
+			dispatcher.enqueue(spawn);
+			accumulated_power -= fire_cost;
+		}
+
+	}
+
+	// Improve the weapon count times
+	virtual void LevelUp(int count) {
+		fire_cost *= std::powf(0.99, count);
+		projectile_count = static_cast<int>(std::ceilf((level + count) / 3.0f));
+		damage *= std::powf(1.05, count);
+	}
+
+	void SetPosition(olc::vf2d pos) {
+		position = pos;
+	}
+	
+private:
+	int projectile_count {1};
+	int level {1};
+	float aim_variance {0.02};
+	float damage {10.0f};
+	ShapePrototypes bullet_shape {ShapePrototypes::Square};
+
+	// Fires when the accumulated_power goes over the fire_cost
+	float accumulated_power {0.0f};
+	float fire_cost {0.1f};
+
+	olc::vf2d aim_direction;
+	olc::vf2d position;
+	entt::registry& reg;
+	entt::dispatcher& dispatcher;
+};
+
 struct PlayerComponent {
 	float health {10.0f};
+	int max_weapon_count {1};
+	std::vector<Weapon> weapons;
 };
 
 struct BulletComponent {
-	olc::vf2d velocity {};
+	BulletComponent() = default;
+	BulletComponent(const SpawnBullet& spawn) : damage(spawn.damage), hit_count(spawn.hit_count), duration(spawn.duration), angular_velocity(spawn.angular_velocity) { }
+	//olc::vf2d velocity {};
 	float damage {10.0f};
 	int hit_count {1};
 	float duration {10.0f};
@@ -203,7 +287,7 @@ struct PhysicsComponent {
 	olc::vf2d force {};
 	float mass {1.0f};
 	float friction {0.95f};
-	float anular_velocity {0.0f};
+	float angular_velocity {0.0f};
 };
 
 struct ParticleComponent {
@@ -302,7 +386,6 @@ struct EnemyAttackSystem : public System {
 				const auto& dir = player_shape.position - s.position;
 				auto& physics = view.get<PhysicsComponent>(entity);
 				physics.force += dir.norm() * -450000.0f;
-				std::cout << physics.force.str() << std::endl;
 
 				auto& player = reg.get<PlayerComponent>(player_entity);
 				player.health -= e.damage;
@@ -432,17 +515,6 @@ private:
 	std::mt19937_64 rng{std::random_device{}()};
 };
 
-struct State {
-	olc::PixelGameEngine* pge;
-
-	State(olc::PixelGameEngine* pge) : pge(pge) {};
-
-	virtual ~State() = default;
-	virtual void EnterState() {};
-	virtual GameState OnUserUpdate(float fElapsedTime) = 0;
-	virtual void ExitState() {};
-};
-
 struct BulletSystem : public System {
 	BulletSystem(entt::dispatcher& dispatcher, entt::registry& reg, olc::PixelGameEngine* pge) : dispatcher(dispatcher), System(reg, pge) {};
 
@@ -493,6 +565,35 @@ private:
 	entt::dispatcher& dispatcher;
 };
 
+struct PlayerWeaponSystem : public System {
+	PlayerWeaponSystem(entt::entity player, entt::registry& reg, olc::PixelGameEngine* pge) : player_entity(player), System(reg, pge) {};
+
+	void OnUserUpdate(float fElapsedTime) override {
+		auto& p = reg.get<PlayerComponent>(player_entity);
+		auto& s = reg.get<Shape>(player_entity);
+
+
+		for(auto& w : p.weapons) {
+			w.SetPosition(s.position);
+			w.OnUserUpdate(fElapsedTime);
+		}
+	}
+private:
+	entt::entity player_entity;
+};
+
+
+struct State {
+	olc::PixelGameEngine* pge;
+
+	State(olc::PixelGameEngine* pge) : pge(pge) {};
+
+	virtual ~State() = default;
+	virtual void EnterState() {};
+	virtual GameState OnUserUpdate(float fElapsedTime) = 0;
+	virtual void ExitState() {};
+};
+
 struct MenuState : public State {
 	MenuState(olc::PixelGameEngine* pge) : State(pge) {};
 	GameState OnUserUpdate(float fElapsedTime) {
@@ -505,8 +606,6 @@ struct MenuState : public State {
 		return next_state;
 	}
 };
-
-
 
 struct GameplayState : public State {
 	//std::unique_ptr<Shape> player;
@@ -539,6 +638,7 @@ struct GameplayState : public State {
 	std::unique_ptr<System> bullet_system;
 	std::unique_ptr<System> particle_system;
 	std::unique_ptr<System> enemy_attack_system;
+	std::unique_ptr<System> player_weapons_system;
 
 	explicit GameplayState(olc::PixelGameEngine* pge) : State(pge) {
 		// Create the square
@@ -569,15 +669,16 @@ struct GameplayState : public State {
 	}
 
 	void spawnBullet(olc::vf2d pos, olc::vf2d vel, ShapePrototypes type = ShapePrototypes::Square) {
-		auto entity = reg.create();
-		auto& s = reg.emplace<Shape>(entity, prototypes[type]);
-		s.MoveTo(pos);
-		s.theta = vel.polar().y + olc::utils::geom2d::pi / 2.0f;
-		s.scale = 0.4f;
-		auto& b = reg.emplace<BulletComponent>(entity, vel);
-		auto& p = reg.emplace<PhysicsComponent>(entity);
-		p.force = vel.norm() * 300000.0f;
-		p.friction = 1.0;
+		SpawnBullet spawn;
+		spawn.position = pos;
+		spawn.damage = 10.0f;
+		spawn.duration = 10.0f;
+		spawn.hit_count = 1;
+		spawn.initial_velocity = vel * player_speed * 1.6f;
+		spawn.angular_velocity = 14.0f;
+		spawn.scale = 0.4f;
+		spawn.shape = type;
+		//dispatcher.enqueue(spawn);
 	}
 
 	void spawnParticle(olc::vf2d pos, olc::vf2d vel, olc::Pixel color = olc::YELLOW, ShapePrototypes type = ShapePrototypes::Triangle) {
@@ -610,9 +711,9 @@ struct GameplayState : public State {
 
 		p.force = input.move_direction * 5000.0f;
 
-		if(input.fire) {
-			spawnBullet(s.position, input.aim_direction);
-		}
+		// if(input.fire) {
+		// 	spawnBullet(s.position, input.aim_direction);
+		// }
 	}
 
 	void on_spawn_enemy(const SpawnEnemy& spawn)  {
@@ -626,14 +727,33 @@ struct GameplayState : public State {
 		reg.emplace<PhysicsComponent>(entity);		
 	}
 
+	void on_bullet_spawn(const SpawnBullet& spawn) {
+		auto entity = reg.create();
+		auto& s = reg.emplace<Shape>(entity, prototypes[spawn.shape]);
+		s.MoveTo(spawn.position);
+		s.theta = spawn.initial_velocity.y;
+		s.scale = spawn.scale;
+		auto& b = reg.emplace<BulletComponent>(entity, spawn);
+		b.damage = spawn.damage;
+		
+		auto& p = reg.emplace<PhysicsComponent>(entity);
+		p.velocity = spawn.initial_velocity;
+		p.angular_velocity = spawn.angular_velocity;
+		p.friction = 1.0;
+	}
+
 	void EnterState() override {
 		dispatcher.sink<EnemyDeath>().connect<&GameplayState::on_enemy_death>(this);
 		dispatcher.sink<PlayerInput>().connect<&GameplayState::on_player_input>(this);
 		dispatcher.sink<SpawnEnemy>().connect<&GameplayState::on_spawn_enemy>(this);
+		dispatcher.sink<SpawnBullet>().connect<&GameplayState::on_bullet_spawn>(this);
 		
 		score = 0.0f;
+
+		// Create the player
 		player_entity = reg.create();
-		reg.emplace<PlayerComponent>(player_entity);
+		auto& p = reg.emplace<PlayerComponent>(player_entity);
+		p.weapons.emplace_back(reg, dispatcher);
 		auto& s = reg.emplace<Shape>(player_entity, prototypes[ShapePrototypes::Star7_3]);
 		s.MoveTo(pge->GetScreenSize() / 2.0f);
 		s.scale = 4.0f;
@@ -647,6 +767,7 @@ struct GameplayState : public State {
 		bullet_system = std::make_unique<BulletSystem>(dispatcher, reg, pge);
 		particle_system = std::make_unique<ParticleSystem>(reg, pge);
 		enemy_attack_system = std::make_unique<EnemyAttackSystem>(player_entity, reg, pge);
+		player_weapons_system = std::make_unique<PlayerWeaponSystem>(player_entity, reg, pge);
 	}
 
 	GameState OnUserUpdate(float fElapsedTime) override {
@@ -658,11 +779,13 @@ struct GameplayState : public State {
 		bullet_system->PreUpdate();
 		particle_system->PreUpdate();
 		enemy_attack_system->PreUpdate();
+		player_weapons_system->PreUpdate();
 
 		dispatcher.update();
 
 		enemy_movement_system->OnUserUpdate(fElapsedTime);
 		enemy_attack_system->OnUserUpdate(fElapsedTime);
+		player_weapons_system->OnUserUpdate(fElapsedTime);
 		physics_system->OnUserUpdate(fElapsedTime/2.0f);
 		physics_system->OnUserUpdate(fElapsedTime/2.0f);
 		draw_system->OnUserUpdate(fElapsedTime);
