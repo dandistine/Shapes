@@ -203,6 +203,17 @@ struct SpawnExperience {
 	float age {0.0f};
 };
 
+struct LevelUp {
+
+};
+
+struct LevelUpOption {
+	// Description to the player of what this option does
+	std::string description;
+	// Functor that actually applies this option to the player
+	std::function<void(entt::registry& reg, entt::entity)> functor;
+};
+
 // Components
 //using Velocity = olc::vf2d;
 
@@ -219,6 +230,33 @@ struct Weapon {
 
 	Weapon(entt::registry& reg, entt::dispatcher& dispatcher) : reg(reg), dispatcher(dispatcher) {
 		dispatcher.sink<PlayerInput>().connect<&Weapon::on_player_input>(this);
+	}
+
+	// Copy all of the non-reference attributes from another weapon
+	void Clone(const Weapon& other) {
+		projectile_count = other.projectile_count;
+		level = other.level;
+		aim_variance = other.aim_variance;
+		damage = other.damage;
+		bullet_shape = other.bullet_shape;
+		accumulated_power = other.accumulated_power;
+		fire_cost = other.fire_cost;
+		aim_direction = other.aim_direction;
+		position = other.position;
+	}
+
+	Weapon(const Weapon& other): reg(other.reg), dispatcher(other.dispatcher) {
+		dispatcher.sink<PlayerInput>().connect<&Weapon::on_player_input>(this);
+		Clone(other);
+	}
+
+	Weapon(Weapon&& other) : reg(other.reg), dispatcher(other.dispatcher) {
+		dispatcher.sink<PlayerInput>().connect<&Weapon::on_player_input>(this);
+		Clone(other);
+	}
+
+	~Weapon() {
+		dispatcher.sink<PlayerInput>().disconnect(this);
 	}
 
 	void on_player_input(const PlayerInput& input) {
@@ -279,7 +317,7 @@ struct PlayerComponent {
 	float max_health {10.0f};
 	int level {1};
 	float experience {0.0f};
-	float xp_to_next_level {10.0f};
+	float xp_to_next_level {5.0f};
 	float experience_range {120.0f};
 	int max_weapon_count {1};
 	std::vector<Weapon> weapons;
@@ -639,6 +677,109 @@ private:
 	entt::entity player_entity;
 };
 
+struct LevelUpPickSystem : public System {
+	LevelUpPickSystem(entt::dispatcher& dispatcher, entt::entity player, entt::registry& reg, olc::PixelGameEngine* pge) : dispatcher(dispatcher), player_entity(player), System(reg, pge) {
+		dispatcher.sink<LevelUp>().connect<&LevelUpPickSystem::on_levelup>(this);
+	};
+
+	~LevelUpPickSystem() {
+		dispatcher.sink<LevelUp>().disconnect(this);
+	}
+
+	// Pick the three choices that a player will get
+	void on_levelup(const LevelUp& levelup) {
+		// Options: improve weapon
+		//          add a random weapon
+		//          add a weapon slot (if all slots are full)
+		//          Improve base in some way
+		//          limited choice count
+		const auto& p = reg.get<PlayerComponent>(player_entity);
+
+		// Clear the old options from the system
+		options.clear();
+
+		// If the player has an open weapon slot, all three choices should be a random weapon
+		if(p.weapons.size() < p.max_weapon_count) {
+			std::string description = "Add a weapon";
+			auto functor = [&](entt::registry& reg, entt::entity e) {
+				auto& p = reg.get<PlayerComponent>(e);
+				p.weapons.emplace_back(reg, dispatcher);
+			};
+
+			for(int i = 0; i < choice_count; i++) {
+				options.emplace_back(LevelUpOption{description, functor});
+			}
+			return;
+		}
+
+		if(p.max_weapon_count < 9) {
+			std::string description = "Add a weapon slot";
+			auto functor = [](entt::registry& reg, entt::entity e) {
+				auto& p = reg.get<PlayerComponent>(e);
+				p.max_weapon_count += 1;
+			};
+
+			options.emplace_back(LevelUpOption{description, functor});
+		}
+
+		// Fill the rest of the options with "improve weapon"
+		for(int i = options.size(); i < choice_count; i++) {
+			int weapon_slot = rand() % p.weapons.size();
+			std::string description = "Improve weapon " + std::to_string(weapon_slot + 1);
+			auto functor = [weapon_slot](entt::registry& reg, entt::entity e) {
+				auto& p = reg.get<PlayerComponent>(e);
+				p.weapons[weapon_slot].LevelUp(1);
+			};
+		}
+	}
+
+	void OnUserUpdate(float fElapsedTime) override {
+		olc::vf2d pos {100.0f, 300.0f};
+		for(auto & o : options) {
+			pge->DrawStringDecal(pos, o.description, olc::WHITE, {3.0f, 3.0f});
+			pos.y += 30.0f;
+		}
+
+		if(pge->GetKey(olc::Key::K1).bPressed) {
+			dispatcher.enqueue(options[0]);
+		}
+
+		if(pge->GetKey(olc::Key::K2).bPressed) {
+			dispatcher.enqueue(options[1]);
+		}
+
+		if(pge->GetKey(olc::Key::K3).bPressed) {
+			dispatcher.enqueue(options[2]);
+		}
+	}
+
+private:
+	entt::dispatcher& dispatcher;
+	entt::entity player_entity;
+	int choice_count {3};
+	std::vector<LevelUpOption> options;
+};
+
+// Track player state and issue related events
+struct PlayerStateSystem : public System {
+	PlayerStateSystem(entt::dispatcher& dispatcher, entt::entity player, entt::registry& reg, olc::PixelGameEngine* pge) : dispatcher(dispatcher), player_entity(player), System(reg, pge) {};
+
+	void OnUserUpdate(float fElapsedTime) override {
+		auto& p = reg.get<PlayerComponent>(player_entity)		;
+
+		if(p.experience >= p.xp_to_next_level) {
+			p.experience -= p.xp_to_next_level;
+			p.xp_to_next_level *= 1.1f;
+
+			// Indicate that the player has leveled up
+			dispatcher.enqueue(LevelUp{});
+		}
+	}
+private:
+	entt::dispatcher& dispatcher;
+	entt::entity player_entity;
+};
+
 struct State {
 	olc::PixelGameEngine* pge;
 
@@ -664,11 +805,12 @@ struct MenuState : public State {
 };
 
 struct GameplayState : public State {
-	//std::unique_ptr<Shape> player;
-	entt::entity player_entity;
+	enum class SubState {
+		Normal,
+		LevelUpScreen
+	};
 
-	//Prototype square_proto;
-	//Prototype cursor_proto;
+	entt::entity player_entity;
 
 	float fTotalTime {0.0f};
 	float enemyTimer {0.0f};
@@ -696,6 +838,12 @@ struct GameplayState : public State {
 	std::unique_ptr<System> enemy_attack_system;
 	std::unique_ptr<System> player_weapons_system;
 	std::unique_ptr<System> experience_system;
+	std::unique_ptr<System> player_state_system;
+	std::unique_ptr<System> levelup_pick_system;
+
+	SubState previous_state;
+	SubState current_state;
+	SubState next_state;
 
 	explicit GameplayState(olc::PixelGameEngine* pge) : State(pge) {
 		rng.seed(std::random_device{}());
@@ -814,12 +962,24 @@ struct GameplayState : public State {
 		reg.emplace<ExperienceComponent>(entity, spawn.value, spawn.age);
 	}
 
+	void on_levelup(const LevelUp& levelup) {
+		next_state = SubState::LevelUpScreen;
+	}
+
+	void on_levelup_option(const LevelUpOption& option) {
+		option.functor(reg, player_entity);
+		next_state = SubState::Normal;
+	}
+
 	void EnterState() override {
+		// Link events to their handlers
 		dispatcher.sink<EnemyDeath>().connect<&GameplayState::on_enemy_death>(this);
 		dispatcher.sink<PlayerInput>().connect<&GameplayState::on_player_input>(this);
 		dispatcher.sink<SpawnEnemy>().connect<&GameplayState::on_spawn_enemy>(this);
 		dispatcher.sink<SpawnBullet>().connect<&GameplayState::on_bullet_spawn>(this);
 		dispatcher.sink<SpawnExperience>().connect<&GameplayState::on_experience_spawn>(this);
+		dispatcher.sink<LevelUp>().connect<&GameplayState::on_levelup>(this);
+		dispatcher.sink<LevelUpOption>().connect<&GameplayState::on_levelup_option>(this);
 		
 		score = 0.0f;
 
@@ -832,6 +992,7 @@ struct GameplayState : public State {
 		s.scale = 4.0f;
 		reg.emplace<PhysicsComponent>(player_entity);
 		
+		// Create all the systems that will be run
 		physics_system = std::make_unique<PhysicsSystem>(reg, pge);
 		enemy_movement_system = std::make_unique<EnemyMovementSystem>(player_entity, reg, pge);
 		draw_system = std::make_unique<DrawSystem>(reg, pge);
@@ -842,9 +1003,25 @@ struct GameplayState : public State {
 		enemy_attack_system = std::make_unique<EnemyAttackSystem>(player_entity, reg, pge);
 		player_weapons_system = std::make_unique<PlayerWeaponSystem>(player_entity, reg, pge);
 		experience_system = std::make_unique<ExperienceSystem>(player_entity, reg, pge);
+		player_state_system = std::make_unique<PlayerStateSystem>(dispatcher, player_entity, reg, pge);
+		levelup_pick_system = std::make_unique<LevelUpPickSystem>(dispatcher, player_entity, reg, pge);
 	}
 
 	GameState OnUserUpdate(float fElapsedTime) override {
+		if(next_state != current_state) {
+			previous_state = current_state;
+			current_state = next_state;
+		}
+
+		if(pge->GetKey(olc::Key::SPACE).bPressed) {
+			if(next_state == SubState::Normal) {
+				next_state = SubState::LevelUpScreen;
+			} else {
+				next_state = SubState::Normal;
+			}
+		}
+
+		// PreUpdates can probably always be run regardless of state
 		physics_system->PreUpdate();
 		enemy_movement_system->PreUpdate();
 		draw_system->PreUpdate();
@@ -855,20 +1032,30 @@ struct GameplayState : public State {
 		enemy_attack_system->PreUpdate();
 		player_weapons_system->PreUpdate();
 		experience_system->PreUpdate();
+		player_state_system->PreUpdate();
+		levelup_pick_system->PreUpdate();
 
 		dispatcher.update();
 
-		enemy_movement_system->OnUserUpdate(fElapsedTime);
-		enemy_attack_system->OnUserUpdate(fElapsedTime);
-		player_weapons_system->OnUserUpdate(fElapsedTime);
-		experience_system->OnUserUpdate(fElapsedTime);
-		physics_system->OnUserUpdate(fElapsedTime/2.0f);
-		physics_system->OnUserUpdate(fElapsedTime/2.0f);
+		if(current_state == SubState::Normal) {
+			enemy_movement_system->OnUserUpdate(fElapsedTime);
+			enemy_attack_system->OnUserUpdate(fElapsedTime);
+			player_weapons_system->OnUserUpdate(fElapsedTime);
+			experience_system->OnUserUpdate(fElapsedTime);
+			physics_system->OnUserUpdate(fElapsedTime/2.0f);
+			physics_system->OnUserUpdate(fElapsedTime/2.0f);
+			input_system->OnUserUpdate(fElapsedTime);
+			spawn_enemy_system->OnUserUpdate(fElapsedTime);
+			bullet_system->OnUserUpdate(fElapsedTime);
+			particle_system->OnUserUpdate(fElapsedTime);
+			player_state_system->OnUserUpdate(fElapsedTime);
+		}
+
+		if(current_state == SubState::LevelUpScreen) {
+			levelup_pick_system->OnUserUpdate(fElapsedTime);
+		}
+
 		draw_system->OnUserUpdate(fElapsedTime);
-		input_system->OnUserUpdate(fElapsedTime);
-		spawn_enemy_system->OnUserUpdate(fElapsedTime);
-		bullet_system->OnUserUpdate(fElapsedTime);
-		particle_system->OnUserUpdate(fElapsedTime);
 
 		fTotalTime += fElapsedTime;
 
@@ -879,6 +1066,7 @@ struct GameplayState : public State {
 			pge->DrawStringDecal({10.0f, 40.0f}, std::format("Timer : {}", fTotalTime), olc::WHITE, olc::vf2d{3.0f, 3.0f});
 			pge->DrawStringDecal({10.0f, 70.0f}, std::format("Level : {}", reg.get<PlayerComponent>(player_entity).level), olc::WHITE, olc::vf2d{3.0f, 3.0f});
 			pge->DrawStringDecal({10.0f, 100.0f}, std::format("Health: {}", reg.get<PlayerComponent>(player_entity).health), olc::WHITE, olc::vf2d{3.0f, 3.0f});
+			pge->DrawStringDecal({10.0f, 130.0f}, std::format("Xp    : {}", reg.get<PlayerComponent>(player_entity).experience), olc::WHITE, olc::vf2d{3.0f, 3.0f});
 
 			// pge->DrawStringDecal({10.0f, 70.0f}, std::format("Enemy: {}", enemyTimer), olc::WHITE, olc::vf2d{3.0f, 3.0f});
 			// pge->DrawStringDecal({10.0f, 100.0f}, std::format("Power: {}", 1 + std::powf(2, fTotalTime / 40.0f)), olc::WHITE, olc::vf2d{3.0f, 3.0f});
