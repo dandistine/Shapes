@@ -194,6 +194,15 @@ struct SpawnBullet {
 	ShapePrototypes shape;
 };
 
+struct SpawnExperience {
+	// Where the experience spawns
+	olc::vf2d position;
+	// How much this experience is worth
+	float value {1.0f};
+	// How long this experience has been on the ground
+	float age {0.0f};
+};
+
 // Components
 //using Velocity = olc::vf2d;
 
@@ -267,6 +276,11 @@ private:
 
 struct PlayerComponent {
 	float health {10.0f};
+	float max_health {10.0f};
+	int level {1};
+	float experience {0.0f};
+	float xp_to_next_level {10.0f};
+	float experience_range {120.0f};
 	int max_weapon_count {1};
 	std::vector<Weapon> weapons;
 };
@@ -292,6 +306,11 @@ struct PhysicsComponent {
 
 struct ParticleComponent {
 	float lifespan {1.0f};
+};
+
+struct ExperienceComponent {
+	float value {1.0f};
+	float age {0.0f};
 };
 
 enum class GameState {
@@ -582,6 +601,43 @@ private:
 	entt::entity player_entity;
 };
 
+struct ExperienceSystem : public System {
+	ExperienceSystem(entt::entity player, entt::registry& reg, olc::PixelGameEngine* pge) : player_entity(player), System(reg, pge) {};
+
+	// Pickup experience touching the player
+	// Pull experience towards the player
+	void OnUserUpdate(float fElapsedTime) override {
+		const auto& player_shape = reg.get<Shape>(player_entity);
+		auto& player_component = reg.get<PlayerComponent>(player_entity);
+		auto view = reg.view<ExperienceComponent, Shape, PhysicsComponent>();
+
+		// If the player is touching an experience, pick it up
+		for(auto entity : view) {
+			const auto& s = view.get<Shape>(entity);
+			if(s.intersects(player_shape)) {
+				const auto& xp = view.get<ExperienceComponent>(entity);
+				player_component.experience += xp.value;
+				reg.destroy(entity);
+			}
+		}
+
+		float xp_range2 = player_component.experience_range * player_component.experience_range;
+		// If the player is somewhat close to an experience, pull it in
+		for(auto entity : view) {
+			const auto& s = view.get<Shape>(entity);
+			auto& p = view.get<PhysicsComponent>(entity);
+
+			olc::vf2d distance = s.position - player_shape.position;
+			float mag2 = distance.mag2();
+			if(mag2 < xp_range2) {
+				p.force += distance.norm() * (mag2 - xp_range2);
+			}
+		}
+	}
+
+private:
+	entt::entity player_entity;
+};
 
 struct State {
 	olc::PixelGameEngine* pge;
@@ -639,16 +695,9 @@ struct GameplayState : public State {
 	std::unique_ptr<System> particle_system;
 	std::unique_ptr<System> enemy_attack_system;
 	std::unique_ptr<System> player_weapons_system;
+	std::unique_ptr<System> experience_system;
 
 	explicit GameplayState(olc::PixelGameEngine* pge) : State(pge) {
-		// Create the square
-		// square_proto.tris.push_back(olc::utils::geom2d::triangle<float>{{-8, -8}, {8, -8}, {-8, 8}});
-		// square_proto.tris.push_back(olc::utils::geom2d::triangle<float>{{8, -8}, {8, 8}, {-8, 8}});
-		
-		// // Create the cursor shape
-		// cursor_proto.tris.push_back(olc::utils::geom2d::triangle<float>{{0, -8}, {8, 8}, {0, 0}});
-		// cursor_proto.tris.push_back(olc::utils::geom2d::triangle<float>{{0, -8}, {0, 0}, {-8, 8}});
-
 		rng.seed(std::random_device{}());
 	}
 
@@ -702,6 +751,13 @@ struct GameplayState : public State {
 			const float angle = dist(rng);
 			spawnParticle(e.position, olc::vf2d{1.0, angle}.cart(), RandomColor(), static_cast<ShapePrototypes>(rand() % 9));
 		}
+
+		// Spawn experience
+		SpawnExperience spawn;
+		spawn.position = e.position;
+		spawn.value = 1.0f;
+		spawn.age = 0.0f;
+		dispatcher.enqueue(spawn);
 	}
 
 	// Event responding to certain player input
@@ -742,11 +798,28 @@ struct GameplayState : public State {
 		p.friction = 1.0;
 	}
 
+	void on_experience_spawn(const SpawnExperience& spawn) {
+		auto entity = reg.create();
+		auto& s = reg.emplace<Shape>(entity, prototypes[ShapePrototypes::Triangle]);
+		auto& p = reg.emplace<PhysicsComponent>(entity);
+		s.MoveTo(spawn.position);
+		s.theta = spawn.position.y;
+		s.scale = 0.4f * (1.0f + 0.1f * spawn.value);
+
+		// Generate a random green color
+		s.color.g = 192 + (rand() % 64);
+		s.color.b = rand() % 128;
+		s.color.r = rand() % 128;
+
+		reg.emplace<ExperienceComponent>(entity, spawn.value, spawn.age);
+	}
+
 	void EnterState() override {
 		dispatcher.sink<EnemyDeath>().connect<&GameplayState::on_enemy_death>(this);
 		dispatcher.sink<PlayerInput>().connect<&GameplayState::on_player_input>(this);
 		dispatcher.sink<SpawnEnemy>().connect<&GameplayState::on_spawn_enemy>(this);
 		dispatcher.sink<SpawnBullet>().connect<&GameplayState::on_bullet_spawn>(this);
+		dispatcher.sink<SpawnExperience>().connect<&GameplayState::on_experience_spawn>(this);
 		
 		score = 0.0f;
 
@@ -768,6 +841,7 @@ struct GameplayState : public State {
 		particle_system = std::make_unique<ParticleSystem>(reg, pge);
 		enemy_attack_system = std::make_unique<EnemyAttackSystem>(player_entity, reg, pge);
 		player_weapons_system = std::make_unique<PlayerWeaponSystem>(player_entity, reg, pge);
+		experience_system = std::make_unique<ExperienceSystem>(player_entity, reg, pge);
 	}
 
 	GameState OnUserUpdate(float fElapsedTime) override {
@@ -780,12 +854,14 @@ struct GameplayState : public State {
 		particle_system->PreUpdate();
 		enemy_attack_system->PreUpdate();
 		player_weapons_system->PreUpdate();
+		experience_system->PreUpdate();
 
 		dispatcher.update();
 
 		enemy_movement_system->OnUserUpdate(fElapsedTime);
 		enemy_attack_system->OnUserUpdate(fElapsedTime);
 		player_weapons_system->OnUserUpdate(fElapsedTime);
+		experience_system->OnUserUpdate(fElapsedTime);
 		physics_system->OnUserUpdate(fElapsedTime/2.0f);
 		physics_system->OnUserUpdate(fElapsedTime/2.0f);
 		draw_system->OnUserUpdate(fElapsedTime);
@@ -799,9 +875,11 @@ struct GameplayState : public State {
 		pge->Clear(olc::VERY_DARK_GREY);
 
 		{
-			pge->DrawStringDecal({10.0f, 10.0f}, std::format("Score: {}", score), olc::WHITE, olc::vf2d{3.0f, 3.0f});
-			pge->DrawStringDecal({10.0f, 40.0f}, std::format("Timer: {}", fTotalTime), olc::WHITE, olc::vf2d{3.0f, 3.0f});
-			pge->DrawStringDecal({10.0f, 70.0f}, std::format("Timer: {}", reg.get<PlayerComponent>(player_entity).health), olc::WHITE, olc::vf2d{3.0f, 3.0f});
+			pge->DrawStringDecal({10.0f, 10.0f}, std::format("Score : {}", score), olc::WHITE, olc::vf2d{3.0f, 3.0f});
+			pge->DrawStringDecal({10.0f, 40.0f}, std::format("Timer : {}", fTotalTime), olc::WHITE, olc::vf2d{3.0f, 3.0f});
+			pge->DrawStringDecal({10.0f, 70.0f}, std::format("Level : {}", reg.get<PlayerComponent>(player_entity).level), olc::WHITE, olc::vf2d{3.0f, 3.0f});
+			pge->DrawStringDecal({10.0f, 100.0f}, std::format("Health: {}", reg.get<PlayerComponent>(player_entity).health), olc::WHITE, olc::vf2d{3.0f, 3.0f});
+
 			// pge->DrawStringDecal({10.0f, 70.0f}, std::format("Enemy: {}", enemyTimer), olc::WHITE, olc::vf2d{3.0f, 3.0f});
 			// pge->DrawStringDecal({10.0f, 100.0f}, std::format("Power: {}", 1 + std::powf(2, fTotalTime / 40.0f)), olc::WHITE, olc::vf2d{3.0f, 3.0f});
 		}
