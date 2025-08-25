@@ -32,7 +32,7 @@ struct PhysicsSystem : public System {
 			auto& physics = view.get<PhysicsComponent>(entity);
 			auto& shape = view.get<Shape>(entity);
 
-			physics.acceleration += physics.force * fElapsedTime;
+			physics.acceleration += (physics.force / physics.mass) * fElapsedTime;
 			physics.velocity += physics.acceleration * fElapsedTime;
 
             shape.theta += physics.angular_velocity * fElapsedTime;

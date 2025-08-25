@@ -25,6 +25,9 @@ struct SpawnEnemy {
 struct EnemyDeath {
 	// Where the enemy died
 	olc::vf2d position;
+
+    // awards experience
+    bool gives_xp {true};
 };
 
 struct SpawnBullet {
@@ -64,4 +67,26 @@ struct LevelUpOption {
 	std::string description;
 	// Functor that actually applies this option to the player
 	std::function<void(entt::registry& reg, entt::entity)> functor;
+};
+
+// Inform that a specific boss should be spawned and begin the boss lead in
+struct SpawnBoss {
+    // Name of the boss
+    std::string name;
+};
+
+// Boss lead in is completed, continue to main boss phase
+struct BeginBossMain {
+    // boss entity id, in case its needed elsewhere
+    entt::entity entity;
+};
+
+// Boss has been killed, begin boss lead out
+struct BossKill {
+
+};
+
+// Boss lead out is done, return to normal play
+struct BossPhaseDone {
+
 };

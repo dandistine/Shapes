@@ -6,6 +6,7 @@ enum class GameState {
 	Unknown,
 	Menu,
 	Gameplay
+
 };
 
 

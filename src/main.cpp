@@ -31,6 +31,7 @@
 #include "systems/levelup_pick.hpp"
 #include "systems/player_state.hpp"
 #include "systems/boss_timer.hpp"
+#include "systems/boss/boss.hpp"
 
 #include <vector>
 #include <random>
@@ -61,7 +62,11 @@ struct MenuState : public State {
 struct GameplayState : public State {
 	enum class SubState {
 		Normal,
-		LevelUpScreen
+		LevelUpScreen,
+		BossLeadIn, // A state where the boss is "entering" the fight
+		Boss, // Boss battle state
+		BossLeadOut,
+		Pause
 	};
 
 	entt::entity player_entity;
@@ -94,6 +99,11 @@ struct GameplayState : public State {
 	std::unique_ptr<System> experience_system;
 	std::unique_ptr<System> player_state_system;
 	std::unique_ptr<System> levelup_pick_system;
+	std::unique_ptr<System> boss_timer_system;
+
+	std::unique_ptr<System> boss_lead_in_system;
+	std::unique_ptr<System> boss_system;
+	std::unique_ptr<System> boss_lead_out_system;
 
 	SubState previous_state;
 	SubState current_state;
@@ -146,6 +156,8 @@ struct GameplayState : public State {
 
 	// Event responding to an enemy death
 	void on_enemy_death(const EnemyDeath& e) {
+        //std::cout << "Kill at " << e.position.str() << std::endl;
+		
 		score += 1.0f;
 
 		for(int i = 0; i < 4; i++) {
@@ -155,11 +167,13 @@ struct GameplayState : public State {
 		}
 
 		// Spawn experience
-		SpawnExperience spawn;
-		spawn.position = e.position;
-		spawn.value = 1.0f;
-		spawn.age = 0.0f;
-		dispatcher.enqueue(spawn);
+		if(e.gives_xp) {
+			SpawnExperience spawn;
+			spawn.position = e.position;
+			spawn.value = 1.0f;
+			spawn.age = 0.0f;
+			dispatcher.enqueue(spawn);
+		}
 	}
 
 	// Event responding to certain player input
@@ -223,7 +237,36 @@ struct GameplayState : public State {
 
 	void on_levelup_option(const LevelUpOption& option) {
 		option.functor(reg, player_entity);
+		next_state = previous_state;
+	}
+
+	void on_spawn_boss(const SpawnBoss& spawn) {
+		// Once the boss spawn is triggered, proceed to the boss lead in and choose a boss to spawn
+		next_state = SubState::BossLeadIn;
+
+		const auto& factory = BigChungusFactory(dispatcher, player_entity, reg, pge);
+		boss_lead_in_system = factory.GetLeadInSystem();
+		boss_system = factory.GetBossSystem();
+		boss_lead_out_system = factory.GetLeadOutSystem();
+
+		std::cout << "Boss Time" << std::endl;
+	}
+
+	void on_boss_main(const BeginBossMain& boss) {
+		next_state = SubState::Boss;
+		std::cout << "Begin Fight" << std::endl;
+	}
+
+	void on_boss_kill(const BossKill& kill) {
+		next_state = SubState::BossLeadOut;
+		std::cout << "Boss Dead" << std::endl;
+
+	}
+
+	void on_boss_phase_done(const BossPhaseDone& phase) {
 		next_state = SubState::Normal;
+		std::cout << "return to Normal" << std::endl;
+
 	}
 
 	void EnterState() override {
@@ -235,6 +278,12 @@ struct GameplayState : public State {
 		dispatcher.sink<SpawnExperience>().connect<&GameplayState::on_experience_spawn>(this);
 		dispatcher.sink<LevelUp>().connect<&GameplayState::on_levelup>(this);
 		dispatcher.sink<LevelUpOption>().connect<&GameplayState::on_levelup_option>(this);
+		
+		// Boss related events
+		dispatcher.sink<SpawnBoss>().connect<&GameplayState::on_spawn_boss>(this);
+		dispatcher.sink<BeginBossMain>().connect<&GameplayState::on_boss_main>(this);
+		dispatcher.sink<BossKill>().connect<&GameplayState::on_boss_kill>(this);
+		dispatcher.sink<BossPhaseDone>().connect<&GameplayState::on_boss_phase_done>(this);
 		
 		score = 0.0f;
 
@@ -260,22 +309,26 @@ struct GameplayState : public State {
 		experience_system = std::make_unique<ExperienceSystem>(player_entity, reg, pge);
 		player_state_system = std::make_unique<PlayerStateSystem>(dispatcher, player_entity, reg, pge);
 		levelup_pick_system = std::make_unique<LevelUpPickSystem>(dispatcher, player_entity, reg, pge);
+		boss_timer_system = std::make_unique<BossTimerSystem>(dispatcher, reg, pge);
 	}
 
 	GameState OnUserUpdate(float fElapsedTime) override {
+		pge->Clear(olc::VERY_DARK_GREY);
+
 		if(fElapsedTime > 1.0f/60.0f) {
 			fElapsedTime = 1.0f/60.0f;
 		}
+
 		if(next_state != current_state) {
 			previous_state = current_state;
 			current_state = next_state;
 		}
 
 		if(pge->GetKey(olc::Key::SPACE).bPressed) {
-			if(next_state == SubState::Normal) {
-				next_state = SubState::LevelUpScreen;
+			if(next_state != SubState::Pause) {
+				next_state = SubState::Pause;
 			} else {
-				next_state = SubState::Normal;
+				next_state = previous_state;
 			}
 		}
 
@@ -292,10 +345,14 @@ struct GameplayState : public State {
 		experience_system->PreUpdate();
 		player_state_system->PreUpdate();
 		levelup_pick_system->PreUpdate();
+		boss_timer_system->PreUpdate();
+
+		// If we're in a boss state, perform the expected pre-updates
+
 
 		dispatcher.update();
 
-		if(current_state == SubState::Normal) {
+		if(current_state != SubState::LevelUpScreen) {
 			enemy_movement_system->OnUserUpdate(fElapsedTime);
 			enemy_attack_system->OnUserUpdate(fElapsedTime);
 			player_weapons_system->OnUserUpdate(fElapsedTime);
@@ -303,10 +360,28 @@ struct GameplayState : public State {
 			physics_system->OnUserUpdate(fElapsedTime/2.0f);
 			physics_system->OnUserUpdate(fElapsedTime/2.0f);
 			input_system->OnUserUpdate(fElapsedTime);
-			spawn_enemy_system->OnUserUpdate(fElapsedTime);
+			// Only spawn enemies if we're not in a boss state, other the boss mechanics will take care of this
+			if(current_state == SubState::Normal) {
+				spawn_enemy_system->OnUserUpdate(fElapsedTime);
+				boss_timer_system->OnUserUpdate(fElapsedTime);
+			}
+
+			if(current_state == SubState::BossLeadIn) {
+				boss_lead_in_system->OnUserUpdate(fElapsedTime);
+			}
+
+			if(current_state == SubState::Boss) {
+				boss_system->OnUserUpdate(fElapsedTime);
+			}
+
+			if(current_state == SubState::BossLeadOut) {
+				boss_lead_out_system->OnUserUpdate(fElapsedTime);
+			}
+
 			bullet_system->OnUserUpdate(fElapsedTime);
 			particle_system->OnUserUpdate(fElapsedTime);
 			player_state_system->OnUserUpdate(fElapsedTime);
+			
 		}
 
 		if(current_state == SubState::LevelUpScreen) {
@@ -364,6 +439,10 @@ public:
 public:
 	bool OnUserCreate() override
 	{
+		int game_layer = CreateLayer();
+		EnableLayer(game_layer, true);
+		SetDrawTarget(static_cast<uint8_t>(game_layer));
+
 		game_states.insert(std::make_pair(GameState::Menu, std::make_unique<MenuState>(this)));
 		game_states.insert(std::make_pair(GameState::Gameplay, std::make_unique<GameplayState>(this)));
 
@@ -511,6 +590,12 @@ public:
 
 	bool OnUserUpdate(float fElapsedTime) override
 	{
+		//auto* target = GetDrawTarget();
+		SetDrawTarget(static_cast<uint8_t>(0));
+		Clear(olc::BLANK);
+		SetDrawTarget(static_cast<uint8_t>(1));
+		Clear(olc::BLANK);
+
 		const auto& state = game_states.at(current_state);
 
 		if (current_state != previous_state) {

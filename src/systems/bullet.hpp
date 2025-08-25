@@ -29,12 +29,19 @@ struct BulletSystem : public System {
 			for(auto e_entity : enemy_view) {
 				auto [e, e_shape] = enemy_view.get(e_entity);
 
+                // If the bullet isn't remotely close, skip the intersection check
+                if((b_shape.position - e_shape.position).mag2() > (e_shape.scale*e_shape.scale*64)) {
+                    continue;
+                }
+
 				// Check if this is a hit
 				if(b_shape.intersects(e_shape)) {
 					b.hit_count--;
 					e.health -= b.damage;
 
 					if(e.health <= 0) {
+                        //std::cout << "Killing " << entt::to_integral(e_entity) << std::endl;
+
 						dispatcher.enqueue<EnemyDeath>(e_shape.position);
 						reg.destroy(e_entity);
 					}
