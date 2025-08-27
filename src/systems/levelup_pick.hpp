@@ -35,7 +35,7 @@ struct LevelUpPickSystem : public System {
 			std::string description = "Add a weapon";
 			auto functor = [&](entt::registry& reg, entt::entity e) {
 				auto& p = reg.get<PlayerComponent>(e);
-				p.weapons.emplace_back(reg, dispatcher);
+				p.weapons.emplace_back(reg, dispatcher, prototypes[ShapePrototypes::Square]);
 			};
 
 			for(int i = 0; i < choice_count; i++) {
@@ -44,20 +44,21 @@ struct LevelUpPickSystem : public System {
 			return;
 		}
 
-		if((ps.WeaponPointCount() - 2) < shape_progression.size()) {
-			std::string description = "Upgrade Core";
-			auto functor = [](entt::registry& reg, entt::entity e) {
-				auto& p = reg.get<PlayerComponent>(e);
-				auto& s = reg.get<Shape>(e);
-				auto& next_shape = prototypes[shape_progression[s.WeaponPoints().size() - 2]];
-				s.SetPrototype(next_shape);
-				//reg.erase<Shape>(e);
-				//reg.emplace<Shape>(e, s, next_shape);
-				//p.max_weapon_count += 1;
-			};
+        // Core upgrades will now come from defeating bosses
+		// if((ps.WeaponPointCount() - 2) < shape_progression.size()) {
+		// 	std::string description = "Upgrade Core";
+		// 	auto functor = [](entt::registry& reg, entt::entity e) {
+		// 		auto& p = reg.get<PlayerComponent>(e);
+		// 		auto& s = reg.get<Shape>(e);
+		// 		auto& next_shape = prototypes[shape_progression[s.WeaponPoints().size() - 2]];
+		// 		s.SetPrototype(next_shape);
+		// 		//reg.erase<Shape>(e);
+		// 		//reg.emplace<Shape>(e, s, next_shape);
+		// 		//p.max_weapon_count += 1;
+		// 	};
 
-			options.emplace_back(LevelUpOption{description, functor});
-		}
+		// 	options.emplace_back(LevelUpOption{description, functor});
+		// }
 
 		// Fill the rest of the options with "improve weapon"
 		for(int i = options.size(); i < choice_count; i++) {
@@ -73,10 +74,14 @@ struct LevelUpPickSystem : public System {
 
 	void OnUserUpdate(float fElapsedTime) override {
 		olc::vf2d pos {100.0f, 300.0f};
+        pge->SetDrawTarget(static_cast<uint8_t>(0));
+
 		for(auto & o : options) {
 			pge->DrawStringDecal(pos, o.description, olc::WHITE, {3.0f, 3.0f});
 			pos.y += 30.0f;
 		}
+        pge->SetDrawTarget(static_cast<uint8_t>(1));
+
 
 		if(pge->GetKey(olc::Key::K1).bPressed) {
 			dispatcher.enqueue(options[0]);

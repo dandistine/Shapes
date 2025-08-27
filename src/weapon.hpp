@@ -10,7 +10,7 @@
 #include <random>
 
 struct Weapon {
-	Weapon(entt::registry& reg, entt::dispatcher& dispatcher);
+	Weapon(entt::registry& reg, entt::dispatcher& dispatcher, const Prototype& prototype);
 
 	// Copy all of the non-reference attributes from another weapon
 	void Clone(const Weapon& other);
@@ -30,7 +30,9 @@ struct Weapon {
 
 	void SetPosition(olc::vf2d pos);
 
-	ShapePrototypes Shape() const;
+    void Draw(olc::PixelGameEngine* pge) const;
+
+	ShapePrototypes BulletShape() const;
 	
 private:
 	int projectile_count {1};
@@ -38,6 +40,7 @@ private:
 	float aim_variance {0.2};
 	float damage {10.0f};
 	ShapePrototypes bullet_shape {ShapePrototypes::Square};
+    Shape shape;
 
 	// Fires when the accumulated_power goes over the fire_cost
 	float accumulated_power {0.0f};

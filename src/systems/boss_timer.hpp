@@ -12,7 +12,8 @@ struct BossTimerSystem : public System {
         if(total_time >= boss_time) {
             total_time = 0.0f;
 
-            dispatcher.enqueue(SpawnBoss{"Boss 1"});
+            dispatcher.enqueue(SpawnBoss{"Boss 1", boss_count});
+            boss_count++;
         }
 	}
 private:
@@ -20,4 +21,7 @@ private:
 
     float total_time {0.0f};
     float boss_time {60.0f};
+    
+    // How many bosses have been summoned
+    int boss_count {0};
 };

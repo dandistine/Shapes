@@ -13,6 +13,7 @@ void Weapon::Clone(const Weapon& other) {
     fire_cost = other.fire_cost;
     aim_direction = other.aim_direction;
     position = other.position;
+    shape = other.shape;
 }
 
 void Weapon::on_player_input(const PlayerInput& input) {
@@ -53,23 +54,28 @@ void Weapon::LevelUp(int count) {
 
 void Weapon::SetPosition(olc::vf2d pos) {
     position = pos;
+    shape.MoveTo(pos);
 }
 
-ShapePrototypes Weapon::Shape() const {
+void Weapon::Draw(olc::PixelGameEngine* pge) const {
+    shape.Draw(pge);
+}
+
+ShapePrototypes Weapon::BulletShape() const {
     return bullet_shape;
 }
 
 
-Weapon::Weapon(entt::registry& reg, entt::dispatcher& dispatcher) : reg(reg), dispatcher(dispatcher) {
+Weapon::Weapon(entt::registry& reg, entt::dispatcher& dispatcher, const Prototype& prototype) : reg(reg), dispatcher(dispatcher), shape(prototype) {
     dispatcher.sink<PlayerInput>().connect<&Weapon::on_player_input>(this);
 }
 
-Weapon::Weapon(const Weapon& other): reg(other.reg), dispatcher(other.dispatcher) {
+Weapon::Weapon(const Weapon& other): reg(other.reg), dispatcher(other.dispatcher), shape(other.shape) {
     dispatcher.sink<PlayerInput>().connect<&Weapon::on_player_input>(this);
     Clone(other);
 }
 
-Weapon::Weapon(Weapon&& other) : reg(other.reg), dispatcher(other.dispatcher) {
+Weapon::Weapon(Weapon&& other) : reg(other.reg), dispatcher(other.dispatcher), shape(other.shape) {
     dispatcher.sink<PlayerInput>().connect<&Weapon::on_player_input>(this);
     Clone(other);
 }

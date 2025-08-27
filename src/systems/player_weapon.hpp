@@ -15,11 +15,6 @@ struct PlayerWeaponSystem : public System {
 			p.weapons[i].SetPosition(wp[i]);
 			p.weapons[i].OnUserUpdate(fElapsedTime);
 		}
-
-		// for(auto& w : p.weapons) {
-		// 	w.SetPosition(s.position);
-		// 	w.OnUserUpdate(fElapsedTime);
-		// }
 	}
 private:
 	entt::entity player_entity;

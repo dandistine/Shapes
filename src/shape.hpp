@@ -40,6 +40,7 @@ struct Prototype {
 
 	std::vector<olc::utils::geom2d::triangle<float>> tris;
 	std::vector<olc::vf2d> weapon_points;
+    ShapePrototypes type;
 };
 
 struct Shape {
@@ -47,6 +48,7 @@ struct Shape {
 	using const_iterator = std::vector<olc::utils::geom2d::triangle<float>>::const_iterator;
 
 	Shape(const Prototype& other) : tris(other.tris), prototype(&other) { }
+    Shape(const Shape& other) : tris(other.tris), prototype(other.prototype) {}
 
 	iterator begin();
 

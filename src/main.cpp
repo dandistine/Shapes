@@ -188,15 +188,29 @@ struct GameplayState : public State {
 		// }
 	}
 
-	void on_spawn_enemy(const SpawnEnemy& spawn)  {
-		auto entity = reg.create();
-		auto& s = reg.emplace<Shape>(entity, prototypes[ShapePrototypes::Square]);
-		s.color = spawn.color;
-		s.scale = 2.0f;
+	void on_spawn_enemy(const SpawnDescriptor& spawn)  {
+		// Find a random position to spawn enemies near
+		utilities::random::uniform_real_distribution<float> dist {0, olc::utils::geom2d::pi * 2.0f};
+		utilities::random::uniform_real_distribution<float> dist_a {0.0f, 50.0f};
+		
+		const float angle = dist(rng);
+		const olc::vf2d main_position = olc::vf2d{pge->ScreenWidth() / 1.7f, angle}.cart() + pge->GetScreenSize() / 2.0f;
 
-		s.MoveTo(spawn.position);
-		reg.emplace<EnemyComponent>(entity);
-		reg.emplace<PhysicsComponent>(entity);		
+		for(int i = 0; i < spawn.count; i++) {
+			auto entity = reg.create();
+			auto& s = reg.emplace<Shape>(entity, prototypes[spawn.type]);
+			s.color = spawn.color;
+			s.scale = spawn.scale;
+
+			olc::vf2d jitter {dist_a(rng), dist_a(rng)};
+			s.MoveTo(main_position + jitter);
+
+			auto& e = reg.emplace<EnemyComponent>(entity);
+			e.health = spawn.health;
+			auto& p = reg.emplace<PhysicsComponent>(entity);
+			p.mass = spawn.mass;
+
+		}
 	}
 
 	void on_bullet_spawn(const SpawnBullet& spawn) {
@@ -245,9 +259,9 @@ struct GameplayState : public State {
 		next_state = SubState::BossLeadIn;
 
 		const auto& factory = BigChungusFactory(dispatcher, player_entity, reg, pge);
-		boss_lead_in_system = factory.GetLeadInSystem();
-		boss_system = factory.GetBossSystem();
-		boss_lead_out_system = factory.GetLeadOutSystem();
+		boss_lead_in_system = factory.GetLeadInSystem(spawn.power);
+		boss_system = factory.GetBossSystem(spawn.power);
+		boss_lead_out_system = factory.GetLeadOutSystem(spawn.power);
 
 		std::cout << "Boss Time" << std::endl;
 	}
@@ -261,6 +275,13 @@ struct GameplayState : public State {
 		next_state = SubState::BossLeadOut;
 		std::cout << "Boss Dead" << std::endl;
 
+		auto& s = reg.get<Shape>(player_entity);
+
+		// If the player is eligible for an upgrade, grant it
+		if(s.WeaponPointCount() - 2 < shape_progression.size()) {
+			auto& next_shape = prototypes[shape_progression[s.WeaponPoints().size() - 2]];
+			s.SetPrototype(next_shape);
+		}
 	}
 
 	void on_boss_phase_done(const BossPhaseDone& phase) {
@@ -273,7 +294,7 @@ struct GameplayState : public State {
 		// Link events to their handlers
 		dispatcher.sink<EnemyDeath>().connect<&GameplayState::on_enemy_death>(this);
 		dispatcher.sink<PlayerInput>().connect<&GameplayState::on_player_input>(this);
-		dispatcher.sink<SpawnEnemy>().connect<&GameplayState::on_spawn_enemy>(this);
+		dispatcher.sink<SpawnDescriptor>().connect<&GameplayState::on_spawn_enemy>(this);
 		dispatcher.sink<SpawnBullet>().connect<&GameplayState::on_bullet_spawn>(this);
 		dispatcher.sink<SpawnExperience>().connect<&GameplayState::on_experience_spawn>(this);
 		dispatcher.sink<LevelUp>().connect<&GameplayState::on_levelup>(this);
@@ -290,7 +311,7 @@ struct GameplayState : public State {
 		// Create the player
 		player_entity = reg.create();
 		auto& p = reg.emplace<PlayerComponent>(player_entity);
-		p.weapons.emplace_back(reg, dispatcher);
+		p.weapons.emplace_back(reg, dispatcher, prototypes[ShapePrototypes::Square]);
 		auto& s = reg.emplace<Shape>(player_entity, prototypes[ShapePrototypes::Triangle]);
 		s.MoveTo(pge->GetScreenSize() / 2.0f);
 		s.scale = 4.0f;
@@ -299,7 +320,7 @@ struct GameplayState : public State {
 		// Create all the systems that will be run
 		physics_system = std::make_unique<PhysicsSystem>(reg, pge);
 		enemy_movement_system = std::make_unique<EnemyMovementSystem>(player_entity, reg, pge);
-		draw_system = std::make_unique<DrawSystem>(reg, pge);
+		draw_system = std::make_unique<DrawSystem>(player_entity, reg, pge);
 		input_system = std::make_unique<KeyboardInputSystem>(dispatcher, player_entity, reg, pge);
 		spawn_enemy_system = std::make_unique<EnemySpawnSystem>(dispatcher, reg, pge);
 		bullet_system = std::make_unique<BulletSystem>(dispatcher, reg, pge);
@@ -355,10 +376,10 @@ struct GameplayState : public State {
 		if(current_state != SubState::LevelUpScreen) {
 			enemy_movement_system->OnUserUpdate(fElapsedTime);
 			enemy_attack_system->OnUserUpdate(fElapsedTime);
-			player_weapons_system->OnUserUpdate(fElapsedTime);
 			experience_system->OnUserUpdate(fElapsedTime);
 			physics_system->OnUserUpdate(fElapsedTime/2.0f);
 			physics_system->OnUserUpdate(fElapsedTime/2.0f);
+			player_weapons_system->OnUserUpdate(fElapsedTime);
 			input_system->OnUserUpdate(fElapsedTime);
 			// Only spawn enemies if we're not in a boss state, other the boss mechanics will take care of this
 			if(current_state == SubState::Normal) {
@@ -460,6 +481,7 @@ public:
 		Prototype cursor_proto;
 		cursor_proto.tris.push_back(olc::utils::geom2d::triangle<float>{{0, -8}, {8, 8}, {0, 0}});
 		cursor_proto.tris.push_back(olc::utils::geom2d::triangle<float>{{0, -8}, {0, 0}, {-8, 8}});
+		cursor_proto.type = ShapePrototypes::Cursor; 
 		// Cursor proto has no weapon points as it is only used for projectiles
 		prototypes.insert({ShapePrototypes::Cursor, cursor_proto});
 
@@ -490,6 +512,9 @@ public:
 			pentagon_proto.tris.push_back(olc::utils::geom2d::triangle<float>{{outer_points[3]}, {outer_points[4]}, {0.0f, 0.0f}});
 			pentagon_proto.tris.push_back(olc::utils::geom2d::triangle<float>{{outer_points[4]}, {outer_points[0]}, {0.0f, 0.0f}});
 
+
+			star52_proto.type = ShapePrototypes::Star5_2;
+			pentagon_proto.type = ShapePrototypes::Pentagon;
 			prototypes.insert({ShapePrototypes::Star5_2, star52_proto});
 			prototypes.insert({ShapePrototypes::Pentagon, pentagon_proto});
 		}
@@ -515,6 +540,8 @@ public:
 			
 			triangle_proto.tris.push_back(olc::utils::geom2d::triangle<float>{points[0], points[2], points[4]});
 
+			star62_proto.type = ShapePrototypes::Star6_2;
+			triangle_proto.type = ShapePrototypes::Triangle; 
 			prototypes.insert({ShapePrototypes::Star6_2, star62_proto});
 			prototypes.insert({ShapePrototypes::Triangle, triangle_proto});
 		}
@@ -542,6 +569,8 @@ public:
 			square_proto.tris.push_back(olc::utils::geom2d::triangle<float>{points[1], points[3], points[5]});
 			square_proto.tris.push_back(olc::utils::geom2d::triangle<float>{points[5], points[7], points[1]});
 			
+			star82_proto.type = ShapePrototypes::Star8_2;
+			square_proto.type = ShapePrototypes::Square;
 			prototypes.insert({ShapePrototypes::Star8_2, star82_proto});
 			prototypes.insert({ShapePrototypes::Square, square_proto});
 		}
@@ -560,8 +589,9 @@ public:
 			star93_proto.tris.push_back(olc::utils::geom2d::triangle<float>{points[0], points[3], points[6]});
 			star93_proto.tris.push_back(olc::utils::geom2d::triangle<float>{points[1], points[4], points[7]});
 			star93_proto.tris.push_back(olc::utils::geom2d::triangle<float>{points[2], points[5], points[8]});
+
+			star93_proto.type = ShapePrototypes::Star9_3;
 			prototypes.insert({ShapePrototypes::Star9_3, star93_proto});
-	
 		}
 
 		Prototype star73_proto;
@@ -581,6 +611,8 @@ public:
 			star73_proto.tris.push_back(olc::utils::geom2d::triangle<float>(points[4], points[0], {0.0f, 0.0f}));
 			star73_proto.tris.push_back(olc::utils::geom2d::triangle<float>(points[5], points[1], {0.0f, 0.0f}));
 			star73_proto.tris.push_back(olc::utils::geom2d::triangle<float>(points[6], points[2], {0.0f, 0.0f}));
+
+			star73_proto.type = ShapePrototypes::Star7_3;
 			prototypes.insert({ShapePrototypes::Star7_3, star73_proto});
 		}
 

@@ -73,6 +73,9 @@ struct LevelUpOption {
 struct SpawnBoss {
     // Name of the boss
     std::string name;
+
+    //Boss power level
+    int power {0};
 };
 
 // Boss lead in is completed, continue to main boss phase
