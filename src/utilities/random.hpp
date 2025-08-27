@@ -129,6 +129,7 @@ namespace utilities::random
         uint64_t operator()(Generator& gen)
         {
             uint64_t x = gen();
+            std::cout << x << std::endl;
             __uint128_t m = static_cast<__uint128_t>(x) * static_cast<__uint128_t>(range);
             uint64_t l = static_cast<uint64_t>(m);
 
@@ -143,6 +144,7 @@ namespace utilities::random
                 }
             }
             uint64_t result = (m >> 64) + min;
+            std::cout << result << std::endl;
             return result;
         }
     };

@@ -32,13 +32,15 @@ struct LevelUpPickSystem : public System {
 
 		// If the player has an open weapon slot, all three choices should be a random weapon
 		if(p.weapons.size() < ps.WeaponPointCount()) {
-			std::string description = "Add a weapon";
-			auto functor = [&](entt::registry& reg, entt::entity e) {
-				auto& p = reg.get<PlayerComponent>(e);
-				p.weapons.emplace_back(reg, dispatcher, prototypes[ShapePrototypes::Square]);
-			};
-
 			for(int i = 0; i < choice_count; i++) {
+                // Pick a random weapon type
+                auto weapon_index = std::uniform_int_distribution<int>{0, weapon_prototypes.size() - 1}(rng);
+
+                std::string description = std::format("Gain a {} weapon", weapon_prototypes[weapon_index]->name);
+                auto functor = [&, weapon_index](entt::registry& reg, entt::entity e) {
+                    auto& p = reg.get<PlayerComponent>(e);
+                    p.weapons.emplace_back(reg, dispatcher, *(weapon_prototypes[weapon_index]));
+                };
 				options.emplace_back(LevelUpOption{description, functor});
 			}
 			return;
@@ -64,6 +66,7 @@ struct LevelUpPickSystem : public System {
 		for(int i = options.size(); i < choice_count; i++) {
 			int weapon_slot = rand() % p.weapons.size();
 			std::string description = "Improve weapon " + std::to_string(weapon_slot + 1);
+
 			auto functor = [weapon_slot](entt::registry& reg, entt::entity e) {
 				auto& p = reg.get<PlayerComponent>(e);
 				p.weapons[weapon_slot].LevelUp(1);
@@ -101,4 +104,6 @@ private:
 	entt::entity player_entity;
 	int choice_count {3};
 	std::vector<LevelUpOption> options;
+	std::mt19937_64 rng{std::random_device{}()};
+
 };

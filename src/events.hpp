@@ -47,6 +47,9 @@ struct SpawnBullet {
 	float scale;
 	// bullet shape
 	ShapePrototypes shape;
+    olc::Pixel color;
+    // Functor called when an enemy is killed
+    std::function<void(void)> on_kill_func {[](){}};
 };
 
 struct SpawnExperience {

@@ -156,15 +156,15 @@ private:
 	entt::dispatcher& dispatcher;
 	// Every power_time seconds the enemy power will scale by power_scale
 	// This happens smoothly over the duration
-	float power_scale {1.5f};
+	float power_scale {2.5f};
 	float power_time {30.0f};
 	float accumulated_power {0.0f};
 	float spawn_cost {10.0f};
 	float total_time {0.0f};
 
-	// Every 5 seconds, attempt to spawn things
+	// Every 2 seconds, attempt to spawn things
 	float spawn_timer {0.0f};
-	float spawn_rate {5.0f};
+	float spawn_rate {2.0f};
 
 	std::mt19937_64 rng{std::random_device{}()};
     std::uniform_int_distribution<int> random_factory{0, spawn_factories.size() - 1};

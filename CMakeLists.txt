@@ -17,7 +17,8 @@ add_executable (${CMAKE_PROJECT_NAME}
     src/main.cpp
     src/olcPixelGameEngine.cpp
     src/shape.cpp
-    src/weapon.cpp
+    src/weapons/default_weapon.cpp
+    src/weapons/weapons.cpp
     src/utilities/utility.cpp
 )
 

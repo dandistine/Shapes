@@ -27,6 +27,11 @@ struct BulletSystem : public System {
 			auto [b, b_shape] = bullet_view.get(b_entity);
 
 			for(auto e_entity : enemy_view) {
+                // Don't allow bullets to hit the same enemy twice in a row
+                if(e_entity == b.last_hit) {
+                    continue;
+                }
+
 				auto [e, e_shape] = enemy_view.get(e_entity);
 
                 // If the bullet isn't remotely close, skip the intersection check

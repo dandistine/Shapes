@@ -3,7 +3,7 @@
 #include "olcPixelGameEngine.h"
 
 #include "events.hpp"
-#include "weapon.hpp"
+#include "weapons/weapon.hpp"
 
 struct EnemyComponent {
 	float health {10.0f};
@@ -33,6 +33,9 @@ struct BulletComponent {
 	int hit_count {1};
 	float duration {10.0f};
 	float angular_velocity {14.0};
+    // Last entity that was hit by this bullet
+    entt::entity last_hit {entt::null};
+    std::function<void(void)> on_kill_func {[](){}};
 };
 
 struct PhysicsComponent {

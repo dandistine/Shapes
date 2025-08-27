@@ -33,6 +33,8 @@
 #include "systems/boss_timer.hpp"
 #include "systems/boss/boss.hpp"
 
+#include "weapons/weapon.hpp"
+
 #include <vector>
 #include <random>
 
@@ -129,19 +131,6 @@ struct GameplayState : public State {
 		reg.emplace<PhysicsComponent>(entity);
 	}
 
-	void spawnBullet(olc::vf2d pos, olc::vf2d vel, ShapePrototypes type = ShapePrototypes::Square) {
-		SpawnBullet spawn;
-		spawn.position = pos;
-		spawn.damage = 10.0f;
-		spawn.duration = 10.0f;
-		spawn.hit_count = 1;
-		spawn.initial_velocity = vel * player_speed * 1.6f;
-		spawn.angular_velocity = 14.0f;
-		spawn.scale = 0.4f;
-		spawn.shape = type;
-		//dispatcher.enqueue(spawn);
-	}
-
 	void spawnParticle(olc::vf2d pos, olc::vf2d vel, olc::Pixel color = olc::YELLOW, ShapePrototypes type = ShapePrototypes::Triangle) {
 		auto entity = reg.create();
 		auto& s = reg.emplace<Shape>(entity, prototypes[type]);
@@ -182,10 +171,6 @@ struct GameplayState : public State {
 		auto& p = reg.get<PhysicsComponent>(player_entity);
 
 		p.force = input.move_direction * 5000.0f;
-
-		// if(input.fire) {
-		// 	spawnBullet(s.position, input.aim_direction);
-		// }
 	}
 
 	void on_spawn_enemy(const SpawnDescriptor& spawn)  {
@@ -219,6 +204,7 @@ struct GameplayState : public State {
 		s.MoveTo(spawn.position);
 		s.theta = spawn.initial_velocity.y;
 		s.scale = spawn.scale;
+		s.color = spawn.color;
 		auto& b = reg.emplace<BulletComponent>(entity, spawn);
 		b.damage = spawn.damage;
 		
@@ -311,7 +297,7 @@ struct GameplayState : public State {
 		// Create the player
 		player_entity = reg.create();
 		auto& p = reg.emplace<PlayerComponent>(player_entity);
-		p.weapons.emplace_back(reg, dispatcher, prototypes[ShapePrototypes::Square]);
+		p.weapons.emplace_back(reg, dispatcher, PierceWeapon);
 		auto& s = reg.emplace<Shape>(player_entity, prototypes[ShapePrototypes::Triangle]);
 		s.MoveTo(pge->GetScreenSize() / 2.0f);
 		s.scale = 4.0f;
