@@ -13,6 +13,7 @@
 extern std::map<ShapePrototypes, Prototype> prototypes;
 
 struct WeaponPrototype {
+	int level {1};
 	int projectile_count {1};
 	int hit_count {1};
 	float aim_variance {0.2f};
@@ -25,14 +26,17 @@ struct WeaponPrototype {
 	std::string name{"Standard"};
 
 	olc::Pixel color {olc::WHITE};
+	// Function to levelup the weapon some number of times
+	std::function<void(WeaponPrototype&, int count)> LevelUpFunction;
 	// Function that can be called when an enemy is killed by this weapon
-	std::function<void(void)> on_kill_func {[](){}};
+	std::function<void(entt::registry&, entt::dispatcher&, olc::vf2d)> on_kill_func {[](entt::registry&, entt::dispatcher&, olc::vf2d){}};
 	ShapePrototypes type {ShapePrototypes::Triangle};
 };
 
-extern std::array<WeaponPrototype*, 2> weapon_prototypes;
+extern std::array<WeaponPrototype*, 3> weapon_prototypes;
 extern WeaponPrototype DefaultWeapon;
 extern WeaponPrototype PierceWeapon;
+extern WeaponPrototype BurstWeapon;
 
 struct Weapon {
 	Weapon(entt::registry& reg, entt::dispatcher& dispatcher, const WeaponPrototype& prototype);

@@ -205,8 +205,8 @@ struct GameplayState : public State {
 		s.theta = spawn.initial_velocity.y;
 		s.scale = spawn.scale;
 		s.color = spawn.color;
+
 		auto& b = reg.emplace<BulletComponent>(entity, spawn);
-		b.damage = spawn.damage;
 		
 		auto& p = reg.emplace<PhysicsComponent>(entity);
 		p.velocity = spawn.initial_velocity;

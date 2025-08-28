@@ -93,4 +93,8 @@ namespace utilities
     }
 
     olc::Pixel RandomColor();
+    olc::Pixel RandomDarkColor();
+    olc::Pixel RandomRedColor();
+    olc::Pixel RandomGreenColor();
+    olc::Pixel RandomBlueColor();
 }

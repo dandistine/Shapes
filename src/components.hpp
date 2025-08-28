@@ -1,8 +1,9 @@
 #pragma once
 
+#include "events.hpp"
+
 #include "olcPixelGameEngine.h"
 
-#include "events.hpp"
 #include "weapons/weapon.hpp"
 
 struct EnemyComponent {
@@ -27,7 +28,7 @@ struct PlayerComponent {
 
 struct BulletComponent {
 	BulletComponent() = default;
-	BulletComponent(const SpawnBullet& spawn) : damage(spawn.damage), hit_count(spawn.hit_count), duration(spawn.duration), angular_velocity(spawn.angular_velocity) { }
+	BulletComponent(const SpawnBullet& spawn) : damage(spawn.damage), hit_count(spawn.hit_count), duration(spawn.duration), angular_velocity(spawn.angular_velocity), on_kill_func(spawn.on_kill_func) { }
 	//olc::vf2d velocity {};
 	float damage {10.0f};
 	int hit_count {1};
@@ -35,7 +36,7 @@ struct BulletComponent {
 	float angular_velocity {14.0};
     // Last entity that was hit by this bullet
     entt::entity last_hit {entt::null};
-    std::function<void(void)> on_kill_func {[](){}};
+    std::function<void(entt::registry&, entt::dispatcher&, olc::vf2d)> on_kill_func {[](entt::registry&, entt::dispatcher&, olc::vf2d){}};
 };
 
 struct PhysicsComponent {

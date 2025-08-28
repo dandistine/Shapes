@@ -21,6 +21,7 @@ void Weapon::Clone(const Weapon& other) {
 
 void Weapon::on_player_input(const PlayerInput& input) {
     aim_direction = input.aim_direction;
+    shape.theta = input.aim_direction.polar().y + olc::utils::geom2d::pi / 2.0f;
 }
 
 void Weapon::OnUserUpdate(float fElapsedTime) {
@@ -54,9 +55,10 @@ void Weapon::OnUserUpdate(float fElapsedTime) {
 
 // Improve the weapon count times
 void Weapon::LevelUp(int count) {
-    prototype.fire_cost *= std::powf(0.99, count);
-    //prototype.projectile_count = static_cast<int>(std::ceilf((level + count) / 3.0f));
-    prototype.damage *= std::powf(1.05, count);
+    prototype.LevelUpFunction(prototype, count);
+    // prototype.fire_cost *= std::powf(0.99, count);
+    // //prototype.projectile_count = static_cast<int>(std::ceilf((level + count) / 3.0f));
+    // prototype.damage *= std::powf(1.05, count);
 }
 
 void Weapon::SetPosition(olc::vf2d pos) {

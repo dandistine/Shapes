@@ -41,12 +41,13 @@ struct BulletSystem : public System {
 
 				// Check if this is a hit
 				if(b_shape.intersects(e_shape)) {
-					b.hit_count--;
+					b.last_hit = e_entity;
+                    b.hit_count--;
 					e.health -= b.damage;
 
 					if(e.health <= 0) {
                         //std::cout << "Killing " << entt::to_integral(e_entity) << std::endl;
-
+                        b.on_kill_func(reg, dispatcher, e_shape.position);
 						dispatcher.enqueue<EnemyDeath>(e_shape.position);
 						reg.destroy(e_entity);
 					}
