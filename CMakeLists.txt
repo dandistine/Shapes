@@ -20,6 +20,7 @@ add_executable (${CMAKE_PROJECT_NAME}
     src/weapons/default_weapon.cpp
     src/weapons/weapons.cpp
     src/utilities/utility.cpp
+    src/systems/boss/big_chungus.cpp
 )
 
 target_include_directories(${CMAKE_PROJECT_NAME}
