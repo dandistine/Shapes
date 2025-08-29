@@ -20,7 +20,7 @@ struct PlayerComponent {
 	int level {1};
 	float experience {0.0f};
 	float xp_to_next_level {5.0f};
-	float experience_range {120.0f};
+	float experience_range {170.0f};
 	int max_weapon_count {1};
 	std::vector<Weapon> weapons;
     std::vector<entt::entity> weapon_entities;

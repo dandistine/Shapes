@@ -7,10 +7,10 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 
 find_package(olcpixelgameengine CONFIG REQUIRED)
-find_package(simple_serialization CONFIG REQUIRED)
-find_package(pcg-cpp CONFIG REQUIRED)
+#find_package(simple_serialization CONFIG REQUIRED)
+#find_package(pcg-cpp CONFIG REQUIRED)
 find_package(EnTT CONFIG REQUIRED)
-find_package(tinyxml2 CONFIG REQUIRED)
+#find_package(tinyxml2 CONFIG REQUIRED)
 
 # Add source to this project's executable.
 add_executable (${CMAKE_PROJECT_NAME} 

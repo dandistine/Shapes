@@ -33,7 +33,7 @@ struct ExperienceSystem : public System {
 			olc::vf2d distance = s.position - player_shape.position;
 			float mag2 = distance.mag2();
 			if(mag2 < xp_range2) {
-				p.force += distance.norm() * (mag2 - xp_range2);
+				p.force += distance.norm() * (mag2 - xp_range2) * fElapsedTime * 100.0f;
 			}
 		}
 	}

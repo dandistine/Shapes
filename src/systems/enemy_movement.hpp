@@ -13,12 +13,15 @@ struct EnemyMovementSystem : public System {
 		const auto& view = reg.view<PhysicsComponent, Shape, EnemyComponent>();
 		const auto& player_position = reg.get<Shape>(player_entity).position;
 
+		for(auto itr = view.begin(); itr != view.end(); itr++) {
+
+		}
 		for(auto entity : view) {
 			auto& physics = view.get<PhysicsComponent>(entity);
 			const auto& s = reg.get<Shape>(entity);
 			const auto& dir = player_position - s.position;
 
-			physics.force += dir.norm() * 4500.0f;
+			physics.force += dir.norm() * 450000.0f * fElapsedTime;
 		}
 	}
 private:

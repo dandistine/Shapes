@@ -134,6 +134,7 @@ struct GameplayState : public State {
 		s.theta = dist(rng);
 		reg.emplace<ParticleComponent>(entity);
 		auto& p = reg.emplace<PhysicsComponent>(entity);
+		p.friction = 0.97f;
 		p.force = vel.norm() * 600000.0f;
 	}
 
@@ -408,8 +409,8 @@ struct GameplayState : public State {
 				boss_lead_out_system->OnUserUpdate(fElapsedTime);
 			}
 
-			physics_system->OnUserUpdate(fElapsedTime/2.0f);
-			physics_system->OnUserUpdate(fElapsedTime/2.0f);
+			physics_system->OnUserUpdate(fElapsedTime);
+			//physics_system->OnUserUpdate(fElapsedTime/2.0f);
 			player_weapons_system->OnUserUpdate(fElapsedTime);
 			input_system->OnUserUpdate(fElapsedTime);
 
@@ -711,7 +712,7 @@ public:
 int main()
 {
 	Jam2025Shapes demo;
-	if (demo.Construct(1280, 960, 1, 1, false, true))
+	if (demo.Construct(1280, 960, 1, 1, false))
 		demo.Start();
 
 	return 0;
