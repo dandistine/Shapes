@@ -117,6 +117,14 @@ GameState MenuState::OnUserUpdate(float fElapsedTime) {
         view.each([this](const Shape& s){s.Draw(pge);});
     }
 
+    {
+        olc::Pixel color = olc::VERY_DARK_GREY * 0.8;
+        color.a = utilities::lerp(255, 0, std::min(1.0f, fTotalTime / 2.0f));
+        pge->SetDrawTarget(static_cast<uint8_t>(0));
+        pge->FillRectDecal({0.0f, 0.0f}, pge->GetScreenSize(), color);
+        pge->SetDrawTarget(static_cast<uint8_t>(1));
+    }
+
     if(pge->GetMouse(0).bPressed) {
         next_state = GameState::Gameplay;
     }

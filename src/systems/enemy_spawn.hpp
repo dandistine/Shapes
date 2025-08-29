@@ -36,14 +36,28 @@ struct StandardEnemyFactory : public SpawnFactory{
             return std::nullopt;
         }
 
-        int spawn_count = std::floorf(current_power / base_cost);
-        float total_cost =  spawn_count * base_cost;
+        float could_spawn = std::floorf(current_power / base_cost);
+        int spawn_count = std::min(5.0f, std::floorf(current_power / base_cost));
+        float total_cost =  could_spawn * base_cost;
+        
+        float bonus_health = 0.0f;
+        float bonus_scale = 0.0f;
+        float bonus_mass = 0.0f;
+
+        if(could_spawn > spawn_count) {
+            bonus_health = (could_spawn - spawn_count) * base_cost / 5.0f;
+            //std::cout << bonus_health << std::endl;
+            // bonus_scale = std::sqrtf(bonus_health);
+            // bonus_mass = std::sqrtf(bonus_scale);
+        }
+
+        
 
         SpawnDescriptor spawn;
         spawn.cost = total_cost;
-        spawn.health = base_cost;
-        spawn.mass = 1.0f;
-        spawn.scale = 2.0f;
+        spawn.health = base_cost + bonus_health;
+        spawn.mass = 1.0f + bonus_mass;
+        spawn.scale = 2.0f + bonus_scale;
         spawn.count = spawn_count;
         spawn.color = olc::GREY;
         spawn.type = ShapePrototypes::Triangle;
@@ -61,7 +75,7 @@ struct HordeEnemyFactory : public SpawnFactory{
             return std::nullopt;
         }
 
-        int spawn_count = 4 + boss_count;
+        int spawn_count = 6 + boss_count;
         float total_cost = base_cost;
 
         SpawnDescriptor spawn;

@@ -45,7 +45,7 @@ void VenusSigilLeadInSystem::OnUserUpdate(float fElapsedTime) {
     total_time += fElapsedTime;
 
     olc::Pixel background_color = utilities::lerp(olc::VERY_DARK_GREY, olc::BLACK, utilities::Ease(total_time / lead_in_time));
-    pge->Clear(background_color);
+    dispatcher.enqueue<SetBackgroundColor>(background_color);
 
     if((total_time > lead_in_time) && !did_spawn) {
         auto entity = reg.create();
@@ -280,7 +280,7 @@ void VenusSigilBossSystem::CheckCollision() {
 }
 
 void VenusSigilBossSystem::OnUserUpdate(float fElapsedTime) {
-    pge->Clear(olc::BLACK);
+    //pge->Clear(olc::BLACK);
     state_timer += fElapsedTime;
 
 
@@ -331,6 +331,17 @@ void VenusSigilBossSystem::OnUserUpdate(float fElapsedTime) {
 
     float width = utilities::lerp(0.0f, pge->ScreenWidth() - 20.0f, utilities::Ease(health / total_health));
     pge->FillRectDecal({10.0f, pge->ScreenHeight() - 30.0f}, {width, 20.0f}, olc::GREEN);
+
+    {
+        // Draw the boss name
+        std::string boss_name = "The Venus Sigil";
+        olc::vf2d name_size = pge->GetTextSize(boss_name) * olc::vf2d{4.0f, 4.0f};
+        olc::vf2d name_pos = olc::vf2d{pge->ScreenWidth() * 0.5f, pge->ScreenHeight() - 60} - name_size * 0.5f;
+        pge->DrawStringDecal(name_pos, boss_name, olc::WHITE, {4.0f, 4.0f});
+
+        //pge->DrawStringDecal()
+    }
+
     pge->SetDrawTarget(static_cast<uint8_t>(1)); // select the Game layer again
 }
 
@@ -344,7 +355,8 @@ void VenusSigilLeadOutSystem::OnUserUpdate(float fElapsedTime) {
     }
 
     olc::Pixel background_color = utilities::lerp(olc::BLACK, olc::VERY_DARK_GREY, utilities::Ease(total_time / lead_out_time));
-    pge->Clear(background_color);
+    dispatcher.enqueue<SetBackgroundColor>(background_color);
+
 
 
     // Draw a health bar across the bottom of the screen

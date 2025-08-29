@@ -65,7 +65,7 @@ struct LevelUpPickSystem : public System {
 		// Fill the rest of the options with "improve weapon"
 		for(int i = options.size(); i < choice_count; i++) {
 			int weapon_slot = rand() % p.weapons.size();
-			const auto& weapon = p.weapons[i];
+			const auto& weapon = p.weapons[weapon_slot];
 			std::string description = std::format("Improve {} weapon from level {} to {}", weapon.Name(), weapon.Level(), weapon.Level() + 1);
 			//std::string description = "Improve weapon " + std::to_string(weapon_slot + 1);
 

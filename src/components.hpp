@@ -60,3 +60,11 @@ struct ExperienceComponent {
 	float value {1.0f};
 	float age {0.0f};
 };
+
+struct DarkTriadComponent {
+	entt::entity boss1;
+	entt::entity boss2;
+	entt::entity boss3;
+};
+
+struct DarkTriadMember { };

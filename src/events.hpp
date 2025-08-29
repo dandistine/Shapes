@@ -97,3 +97,11 @@ struct BossKill {
 struct BossPhaseDone {
 
 };
+
+struct SetBackgroundColor {
+	olc::Pixel color;
+};
+
+struct PlayerDied {
+	
+};

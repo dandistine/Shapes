@@ -56,6 +56,7 @@ void Weapon::OnUserUpdate(float fElapsedTime) {
 // Improve the weapon count times
 void Weapon::LevelUp(int count) {
     prototype.LevelUpFunction(prototype, count);
+    level += count;
     // prototype.fire_cost *= std::powf(0.99, count);
     // //prototype.projectile_count = static_cast<int>(std::ceilf((level + count) / 3.0f));
     // prototype.damage *= std::powf(1.05, count);

@@ -23,6 +23,10 @@ struct PlayerStateSystem : public System {
         s.position.x = std::max(v, std::min(pge->ScreenWidth() - v, s.position.x));
         s.position.y = std::max(v, std::min(pge->ScreenHeight() - v, s.position.y));
 
+		if(p.health <= 0.0f) {
+			dispatcher.enqueue(PlayerDied{});
+		}
+
 	}
 private:
 	entt::dispatcher& dispatcher;

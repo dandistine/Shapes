@@ -22,6 +22,7 @@ add_executable (${CMAKE_PROJECT_NAME}
     src/utilities/utility.cpp
     src/systems/boss/big_chungus.cpp
     src/systems/boss/venus_sigil.cpp
+    src/systems/boss/dark_triad.cpp
     src/states/menu_state.cpp
 )
 

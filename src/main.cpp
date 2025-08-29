@@ -58,7 +58,8 @@ struct GameplayState : public State {
 		BossLeadIn, // A state where the boss is "entering" the fight
 		Boss, // Boss battle state
 		BossLeadOut,
-		Pause
+		Pause,
+		Dead
 	};
 
 	entt::entity player_entity;
@@ -71,11 +72,12 @@ struct GameplayState : public State {
 	float enemy_threshold {10.0f};
 	float enemy_cost {10.0f};
 	float score {0.0f};
+	float dead_time {0.0f};
 
 	entt::registry reg;
 	entt::dispatcher dispatcher;
 
-	std::mt19937_64 rng;
+	std::mt19937_64 rng{std::random_device{}()};
 
 	struct enemy_death{};
 
@@ -97,13 +99,13 @@ struct GameplayState : public State {
 	std::unique_ptr<System> boss_system;
 	std::unique_ptr<System> boss_lead_out_system;
 
-	SubState previous_state;
-	SubState current_state;
-	SubState next_state;
+	SubState previous_state {SubState::Normal};
+	SubState current_state {SubState::Normal};
+	SubState next_state {SubState::Normal};
 
-	explicit GameplayState(olc::PixelGameEngine* pge) : State(pge) {
-		rng.seed(std::random_device{}());
-	}
+	olc::Pixel background_color {olc::VERY_DARK_GREY};
+
+	explicit GameplayState(olc::PixelGameEngine* pge) : State(pge) { }
 
 	void tickEnemyTimer() {
 		auto entity = reg.create();
@@ -234,22 +236,33 @@ struct GameplayState : public State {
 		// Once the boss spawn is triggered, proceed to the boss lead in and choose a boss to spawn
 		next_state = SubState::BossLeadIn;
 
-		const auto& factory = VenusSigilFactory(dispatcher, player_entity, reg, pge);
-		boss_lead_in_system = factory.GetLeadInSystem(spawn.power);
-		boss_system = factory.GetBossSystem(spawn.power);
-		boss_lead_out_system = factory.GetLeadOutSystem(spawn.power);
+		int factory_id = std::uniform_int_distribution<int>{0, 2}(rng);
 
-		std::cout << "Boss Time" << std::endl;
+		std::unique_ptr<BossFactory> factory;
+
+		if(factory_id == 0) {
+			factory = std::make_unique<DarkTriadFactory>(dispatcher, player_entity, reg, pge);
+		} else if (factory_id == 1) {
+			factory = std::make_unique<BigChungusFactory>(dispatcher, player_entity, reg, pge);
+		} else {
+			factory = std::make_unique<VenusSigilFactory>(dispatcher, player_entity, reg, pge);
+		}
+
+		boss_lead_in_system = factory->GetLeadInSystem(spawn.power);
+		boss_system = factory->GetBossSystem(spawn.power);
+		boss_lead_out_system = factory->GetLeadOutSystem(spawn.power);
+
+		//std::cout << "Boss Time" << std::endl;
 	}
 
 	void on_boss_main(const BeginBossMain& boss) {
 		next_state = SubState::Boss;
-		std::cout << "Begin Fight" << std::endl;
+		//std::cout << "Begin Fight" << std::endl;
 	}
 
 	void on_boss_kill(const BossKill& kill) {
 		next_state = SubState::BossLeadOut;
-		std::cout << "Boss Dead" << std::endl;
+		//std::cout << "Boss Dead" << std::endl;
 
 		auto& s = reg.get<Shape>(player_entity);
 
@@ -262,8 +275,16 @@ struct GameplayState : public State {
 
 	void on_boss_phase_done(const BossPhaseDone& phase) {
 		next_state = SubState::Normal;
-		std::cout << "return to Normal" << std::endl;
+		//std::cout << "return to Normal" << std::endl;
 
+	}
+
+	void on_set_background_color(const SetBackgroundColor& color) {
+		background_color = color.color;
+	}
+
+	void on_player_died(const PlayerDied& p) {
+		next_state = SubState::Dead;
 	}
 
 	void EnterState() override {
@@ -275,6 +296,8 @@ struct GameplayState : public State {
 		dispatcher.sink<SpawnExperience>().connect<&GameplayState::on_experience_spawn>(this);
 		dispatcher.sink<LevelUp>().connect<&GameplayState::on_levelup>(this);
 		dispatcher.sink<LevelUpOption>().connect<&GameplayState::on_levelup_option>(this);
+		dispatcher.sink<SetBackgroundColor>().connect<&GameplayState::on_set_background_color>(this);
+		dispatcher.sink<PlayerDied>().connect<&GameplayState::on_player_died>(this);
 		
 		// Boss related events
 		dispatcher.sink<SpawnBoss>().connect<&GameplayState::on_spawn_boss>(this);
@@ -287,7 +310,7 @@ struct GameplayState : public State {
 		// Create the player
 		player_entity = reg.create();
 		auto& p = reg.emplace<PlayerComponent>(player_entity);
-		p.weapons.emplace_back(reg, dispatcher, PierceWeapon);
+		p.weapons.emplace_back(reg, dispatcher, DefaultWeapon);
 		auto& s = reg.emplace<Shape>(player_entity, prototypes[ShapePrototypes::Triangle]);
 		s.MoveTo(pge->GetScreenSize() / 2.0f);
 		s.scale = 4.0f;
@@ -311,7 +334,15 @@ struct GameplayState : public State {
 	}
 
 	GameState OnUserUpdate(float fElapsedTime) override {
-		pge->Clear(olc::VERY_DARK_GREY);
+		pge->Clear(background_color);
+
+		if(current_state == SubState::Dead) {
+			dead_time += fElapsedTime;
+			fElapsedTime = 0.0f;
+		}
+		if(current_state == SubState::Pause) {
+			fElapsedTime = 0.0f;
+		}
 
 		if(fElapsedTime > 1.0f/60.0f) {
 			fElapsedTime = 1.0f/60.0f;
@@ -323,7 +354,7 @@ struct GameplayState : public State {
 		}
 
 		if(pge->GetKey(olc::Key::SPACE).bPressed) {
-			if(next_state != SubState::Pause) {
+			if((next_state != SubState::Pause) && (next_state != SubState::Dead)) {
 				next_state = SubState::Pause;
 			} else {
 				next_state = previous_state;
@@ -354,10 +385,6 @@ struct GameplayState : public State {
 			enemy_movement_system->OnUserUpdate(fElapsedTime);
 			enemy_attack_system->OnUserUpdate(fElapsedTime);
 			experience_system->OnUserUpdate(fElapsedTime);
-			physics_system->OnUserUpdate(fElapsedTime/2.0f);
-			physics_system->OnUserUpdate(fElapsedTime/2.0f);
-			player_weapons_system->OnUserUpdate(fElapsedTime);
-			input_system->OnUserUpdate(fElapsedTime);
 			// Only spawn enemies if we're not in a boss state, other the boss mechanics will take care of this
 			if(current_state == SubState::Normal) {
 				spawn_enemy_system->OnUserUpdate(fElapsedTime);
@@ -376,9 +403,17 @@ struct GameplayState : public State {
 				boss_lead_out_system->OnUserUpdate(fElapsedTime);
 			}
 
+			physics_system->OnUserUpdate(fElapsedTime/2.0f);
+			physics_system->OnUserUpdate(fElapsedTime/2.0f);
+			player_weapons_system->OnUserUpdate(fElapsedTime);
+			input_system->OnUserUpdate(fElapsedTime);
+
 			bullet_system->OnUserUpdate(fElapsedTime);
 			particle_system->OnUserUpdate(fElapsedTime);
-			player_state_system->OnUserUpdate(fElapsedTime);
+			
+			if(current_state != SubState::Dead) {
+				player_state_system->OnUserUpdate(fElapsedTime);
+			}
 			
 		}
 
@@ -390,7 +425,6 @@ struct GameplayState : public State {
 
 		draw_system->OnUserUpdate(fElapsedTime);
 
-
 		{
 			pge->DrawStringDecal({10.0f, 10.0f}, std::format("Score : {}", score), olc::WHITE, olc::vf2d{3.0f, 3.0f});
 			pge->DrawStringDecal({10.0f, 40.0f}, std::format("Timer : {}", fTotalTime), olc::WHITE, olc::vf2d{3.0f, 3.0f});
@@ -400,6 +434,19 @@ struct GameplayState : public State {
 
 			// pge->DrawStringDecal({10.0f, 70.0f}, std::format("Enemy: {}", enemyTimer), olc::WHITE, olc::vf2d{3.0f, 3.0f});
 			// pge->DrawStringDecal({10.0f, 100.0f}, std::format("Power: {}", 1 + std::powf(2, fTotalTime / 40.0f)), olc::WHITE, olc::vf2d{3.0f, 3.0f});
+		}
+
+		if(current_state == SubState::Dead) {
+			olc::Pixel fade_to = olc::VERY_DARK_GREY * 0.8;
+			olc::Pixel color = utilities::lerp(background_color, fade_to, std::min(1.0f, dead_time / 4.0f));
+			color.a = utilities::lerp(0, 255, std::min(1.0f, dead_time / 4.0f));
+			pge->SetDrawTarget(static_cast<uint8_t>(0));
+			pge->FillRectDecal({0.0f, 0.0f}, pge->GetScreenSize(), color);
+			pge->SetDrawTarget(static_cast<uint8_t>(1));
+			
+			if(dead_time > 5.0f) {
+				return GameState::Menu;
+			}
 		}
 		return GameState::Gameplay;
 	}
@@ -626,6 +673,11 @@ public:
 
 		if (next_state != current_state) {
 			state->ExitState();
+			if(next_state == GameState::Gameplay) {
+				game_states[GameState::Gameplay] = std::make_unique<GameplayState>(this);
+			} else if(next_state == GameState::Menu) {
+				game_states[GameState::Menu] = std::make_unique<MenuState>(this);
+			}
 		}
 
 		previous_state = current_state;
