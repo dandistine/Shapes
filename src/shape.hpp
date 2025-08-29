@@ -15,7 +15,8 @@ enum class ShapePrototypes {
 	Star6_2,
 	Star7_3,
 	Star8_2,
-	Star9_3
+	Star9_3,
+	Cross
 };
 
 extern std::array<ShapePrototypes, 7> shape_progression;

@@ -18,6 +18,10 @@ namespace utilities
         return olc::Pixel(rand() % 128, rand() % 128, rand() % 128);
     }
 
+    olc::Pixel RandomBrightColor() {
+        return olc::Pixel(128 + (rand() % 128), 128 + (rand() % 128), 128 + (rand() % 128));
+    }
+
     olc::Pixel RandomRedColor() {
         return olc::Pixel(128 + (rand() % 128), rand() % 128, rand() % 128);
     }

@@ -74,6 +74,14 @@ ShapePrototypes Weapon::BulletShape() const {
     return prototype.type;
 }
 
+std::string Weapon::Name() const {
+    return prototype.name;
+}
+
+int Weapon::Level() const {
+    return level;
+}
+
 Weapon::Weapon(entt::registry& reg, entt::dispatcher& dispatcher, const WeaponPrototype& prototype) : reg(reg), dispatcher(dispatcher), shape(prototypes[prototype.type]), prototype(prototype) {
     shape.color = prototype.color;
     dispatcher.sink<PlayerInput>().connect<&Weapon::on_player_input>(this);

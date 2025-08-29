@@ -65,7 +65,9 @@ struct LevelUpPickSystem : public System {
 		// Fill the rest of the options with "improve weapon"
 		for(int i = options.size(); i < choice_count; i++) {
 			int weapon_slot = rand() % p.weapons.size();
-			std::string description = "Improve weapon " + std::to_string(weapon_slot + 1);
+			const auto& weapon = p.weapons[i];
+			std::string description = std::format("Improve {} weapon from level {} to {}", weapon.Name(), weapon.Level(), weapon.Level() + 1);
+			//std::string description = "Improve weapon " + std::to_string(weapon_slot + 1);
 
 			auto functor = [weapon_slot](entt::registry& reg, entt::entity e) {
 				auto& p = reg.get<PlayerComponent>(e);

@@ -142,7 +142,7 @@ struct GameplayState : public State {
 		for(int i = 0; i < 4; i++) {
 			utilities::random::uniform_real_distribution<float> dist {0, static_cast<float>(olc::utils::geom2d::pi) * 2.0f};
 			const float angle = dist(rng);
-			spawnParticle(e.position, olc::vf2d{1.0, angle}.cart(), utilities::RandomColor(), static_cast<ShapePrototypes>(rand() % 9));
+			spawnParticle(e.position, olc::vf2d{1.0, angle}.cart(), utilities::RandomColor(), static_cast<ShapePrototypes>(rand() % 10));
 		}
 
 		// Spawn experience
@@ -160,7 +160,7 @@ struct GameplayState : public State {
 		const auto& s = reg.get<Shape>(player_entity);
 		auto& p = reg.get<PhysicsComponent>(player_entity);
 
-		p.force = input.move_direction * 5000.0f;
+		p.force = input.move_direction * 7000.0f;
 	}
 
 	void on_spawn_enemy(const SpawnDescriptor& spawn)  {
@@ -234,7 +234,7 @@ struct GameplayState : public State {
 		// Once the boss spawn is triggered, proceed to the boss lead in and choose a boss to spawn
 		next_state = SubState::BossLeadIn;
 
-		const auto& factory = BigChungusFactory(dispatcher, player_entity, reg, pge);
+		const auto& factory = VenusSigilFactory(dispatcher, player_entity, reg, pge);
 		boss_lead_in_system = factory.GetLeadInSystem(spawn.power);
 		boss_system = factory.GetBossSystem(spawn.power);
 		boss_lead_out_system = factory.GetLeadOutSystem(spawn.power);
@@ -291,6 +291,7 @@ struct GameplayState : public State {
 		auto& s = reg.emplace<Shape>(player_entity, prototypes[ShapePrototypes::Triangle]);
 		s.MoveTo(pge->GetScreenSize() / 2.0f);
 		s.scale = 4.0f;
+		s.color = utilities::RandomBrightColor();
 		reg.emplace<PhysicsComponent>(player_entity);
 		
 		// Create all the systems that will be run
@@ -383,13 +384,12 @@ struct GameplayState : public State {
 
 		if(current_state == SubState::LevelUpScreen) {
 			levelup_pick_system->OnUserUpdate(fElapsedTime);
+		} else {
+			fTotalTime += fElapsedTime;
 		}
 
 		draw_system->OnUserUpdate(fElapsedTime);
 
-		fTotalTime += fElapsedTime;
-
-		pge->Clear(olc::VERY_DARK_GREY);
 
 		{
 			pge->DrawStringDecal({10.0f, 10.0f}, std::format("Score : {}", score), olc::WHITE, olc::vf2d{3.0f, 3.0f});
@@ -522,9 +522,10 @@ public:
 			prototypes.insert({ShapePrototypes::Triangle, triangle_proto});
 		}
 
-		// Create the star82 shape and the square since they share some points
+		// Create the star82 shape, square, and cross since they share some points
 		Prototype star82_proto;
 		Prototype square_proto;
+		Prototype cross_proto;
 		{
 			std::array<olc::vf2d, 8> points;
 			for(int i = 0; i < 8; i++) {
@@ -532,6 +533,7 @@ public:
 				points[i] = olc::vf2d{-8.0f * std::cosf(angle), -8.0f * std::sinf(angle)};
 
 				star82_proto.weapon_points.push_back(points[i]);
+				cross_proto.weapon_points.push_back(points[i]);
 				if((i % 2) == 1) {
 					square_proto.weapon_points.push_back(points[i]);
 				}
@@ -544,11 +546,21 @@ public:
 
 			square_proto.tris.push_back(olc::utils::geom2d::triangle<float>{points[1], points[3], points[5]});
 			square_proto.tris.push_back(olc::utils::geom2d::triangle<float>{points[5], points[7], points[1]});
+
+			cross_proto.tris.push_back(olc::utils::geom2d::triangle<float>{points[0], points[1], points[4]});
+			cross_proto.tris.push_back(olc::utils::geom2d::triangle<float>{points[4], points[5], points[0]});
+			cross_proto.tris.push_back(olc::utils::geom2d::triangle<float>{points[2], points[3], points[6]});
+			cross_proto.tris.push_back(olc::utils::geom2d::triangle<float>{points[6], points[7], points[2]});
+
+			
 			
 			star82_proto.type = ShapePrototypes::Star8_2;
 			square_proto.type = ShapePrototypes::Square;
+			cross_proto.type = ShapePrototypes::Cross;
 			prototypes.insert({ShapePrototypes::Star8_2, star82_proto});
 			prototypes.insert({ShapePrototypes::Square, square_proto});
+			prototypes.insert({ShapePrototypes::Cross, cross_proto});
+
 		}
 
 		// Create the star93 shape

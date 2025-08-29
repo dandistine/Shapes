@@ -8,11 +8,12 @@ struct BulletSystem : public System {
 
 	void PreUpdate() override {
 		// Check if any bullets are off-screen and cull them before processing this frame
+		// or have expired
 		auto view = reg.view<BulletComponent, Shape>();
 
 		for(const auto e : view) {
-			const auto& s = reg.get<Shape>(e);
-			if ((s.position.x < -10.0f) || (s.position.y < -10.0f) || (s.position.x > pge->ScreenWidth() + 10.0f) || (s.position.y > pge->ScreenHeight() + 10.0f)) {
+			auto [b, s] = view.get(e);
+			if ((s.position.x < -10.0f) || (s.position.y < -10.0f) || (s.position.x > pge->ScreenWidth() + 10.0f) || (s.position.y > pge->ScreenHeight() + 10.0f) || (b.duration < 0.0f)) {
 				reg.destroy(e);
 			}
 		}
@@ -25,6 +26,8 @@ struct BulletSystem : public System {
 
 		for(auto b_entity : bullet_view) {
 			auto [b, b_shape] = bullet_view.get(b_entity);
+
+			b.duration -= fElapsedTime;
 
 			for(auto e_entity : enemy_view) {
                 // Don't allow bullets to hit the same enemy twice in a row

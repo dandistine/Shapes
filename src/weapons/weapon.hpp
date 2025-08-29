@@ -33,7 +33,7 @@ struct WeaponPrototype {
 	ShapePrototypes type {ShapePrototypes::Triangle};
 };
 
-extern std::array<WeaponPrototype*, 3> weapon_prototypes;
+extern std::array<WeaponPrototype*, 5> weapon_prototypes;
 extern WeaponPrototype DefaultWeapon;
 extern WeaponPrototype PierceWeapon;
 extern WeaponPrototype BurstWeapon;
@@ -58,6 +58,10 @@ struct Weapon {
 	virtual void LevelUp(int count);
 
 	void SetPosition(olc::vf2d pos);
+
+	std::string Name() const;
+
+	int Level() const;
 
     void Draw(olc::PixelGameEngine* pge) const;
 

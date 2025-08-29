@@ -100,7 +100,7 @@ void BigChungusBossSystem::OnUserUpdate(float fElapsedTime) {
     if(reg.valid(boss_entity)) {
         const auto& e = reg.get<EnemyComponent>(boss_entity);
         health = e.health;
-        pge->DrawStringDecal({10.0f, 170.0f}, std::to_string(health), olc::WHITE, {3.0f, 3.0f});
+        //pge->DrawStringDecal({10.0f, 170.0f}, std::to_string(health), olc::WHITE, {3.0f, 3.0f});
     }
 
     // Check if Big Chungus has been killed
