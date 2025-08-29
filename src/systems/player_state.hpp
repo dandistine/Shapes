@@ -16,6 +16,13 @@ struct PlayerStateSystem : public System {
 			// Indicate that the player has leveled up
 			dispatcher.enqueue(LevelUp{});
 		}
+
+        // Clamp the player to vaguely in the screen
+        auto& s = reg.get<Shape>(player_entity);
+        const auto v = s.scale * 8.0f;
+        s.position.x = std::max(v, std::min(pge->ScreenWidth() - v, s.position.x));
+        s.position.y = std::max(v, std::min(pge->ScreenHeight() - v, s.position.y));
+
 	}
 private:
 	entt::dispatcher& dispatcher;

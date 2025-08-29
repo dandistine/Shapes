@@ -8,7 +8,7 @@
 struct BigChungusLeadInSystem : public System {
     BigChungusLeadInSystem(int power, entt::dispatcher& dispatcher, entt::entity player, entt::registry& reg, olc::PixelGameEngine* pge);
 
-    void OnUserUpdate(float fElapsedTime);
+    void OnUserUpdate(float fElapsedTime) override;
 
     
 private:
@@ -29,7 +29,7 @@ struct BigChungusBossSystem : public System {
 
     void on_boss_main(const BeginBossMain& boss);
 
-    void OnUserUpdate(float fElapsedTime);
+    void OnUserUpdate(float fElapsedTime) override;
 
     
 private:
@@ -43,7 +43,7 @@ private:
 struct BigChungusLeadOutSystem : public System {
     BigChungusLeadOutSystem(int power, entt::dispatcher& dispatcher, entt::entity player, entt::registry& reg, olc::PixelGameEngine* pge);
 
-    void OnUserUpdate(float fElapsedTime);
+    void OnUserUpdate(float fElapsedTime) override ;
 
     
 private:
