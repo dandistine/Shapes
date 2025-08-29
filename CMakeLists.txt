@@ -21,6 +21,7 @@ add_executable (${CMAKE_PROJECT_NAME}
     src/weapons/weapons.cpp
     src/utilities/utility.cpp
     src/systems/boss/big_chungus.cpp
+    src/states/menu_state.cpp
 )
 
 target_include_directories(${CMAKE_PROJECT_NAME}

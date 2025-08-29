@@ -18,6 +18,8 @@ enum class ShapePrototypes {
 	Star9_3
 };
 
+extern std::array<ShapePrototypes, 7> shape_progression;
+
 struct Prototype {
 	using iterator = std::vector<olc::utils::geom2d::triangle<float>>::iterator;
 	using const_iterator = std::vector<olc::utils::geom2d::triangle<float>>::const_iterator;
@@ -43,12 +45,15 @@ struct Prototype {
     ShapePrototypes type;
 };
 
+// Map of the potential prototypes
+extern std::map<ShapePrototypes, Prototype> prototypes;
+
 struct Shape {
 	using iterator = std::vector<olc::utils::geom2d::triangle<float>>::iterator;
 	using const_iterator = std::vector<olc::utils::geom2d::triangle<float>>::const_iterator;
 
 	Shape(const Prototype& other) : tris(other.tris), prototype(&other) { }
-    Shape(const Shape& other) : tris(other.tris), prototype(other.prototype) {}
+    Shape(const Shape& other) : tris(other.tris), prototype(other.prototype), scale(other.scale), theta(other.theta), position(other.position), color(other.color) {}
 
 	iterator begin();
 

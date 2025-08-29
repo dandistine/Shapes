@@ -143,7 +143,7 @@ struct EnemySpawnSystem : public System {
 
 			SpawnEnemy spawn;
 			spawn.color = olc::YELLOW;
-			utilities::random::uniform_real_distribution<float> dist {0, olc::utils::geom2d::pi * 2.0f};
+			utilities::random::uniform_real_distribution<float> dist {0, static_cast<float>(olc::utils::geom2d::pi) * 2.0f};
 			const float angle = dist(rng);
 
 			// Position the enemy to spawn outside the visiable map area

@@ -52,7 +52,7 @@ WeaponPrototype BurstWeapon{
     },
     .on_kill_func {
         [](entt::registry& reg, entt::dispatcher& dispatcher, olc::vf2d position) {
-            utilities::random::uniform_real_distribution<float> dist{olc::utils::geom2d::pi, -olc::utils::geom2d::pi};
+            utilities::random::uniform_real_distribution<float> dist{static_cast<float>(olc::utils::geom2d::pi), -static_cast<float>(olc::utils::geom2d::pi)};
             // Spawn a bunch of projectiles
             for(int i = 0; i < 32; i++) {
                 float r1 = dist(weapon_rng);

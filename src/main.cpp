@@ -15,7 +15,9 @@
 #include "components.hpp"
 #include "events.hpp"
 #include "shape.hpp"
-#include "state.hpp"
+
+#include "states/state.hpp"
+#include "states/menu_state.hpp"
 
 #include "systems/system.hpp"
 #include "systems/physics.hpp"
@@ -48,18 +50,6 @@ std::array<ShapePrototypes, 7> shape_progression {ShapePrototypes::Triangle, Sha
 // Map of the potential prototypes
 std::map<ShapePrototypes, Prototype> prototypes;
 
-struct MenuState : public State {
-	MenuState(olc::PixelGameEngine* pge) : State(pge) {};
-	GameState OnUserUpdate(float fElapsedTime) {
-		GameState next_state = GameState::Menu;
-
-		if(pge->GetMouse(0).bPressed) {
-			next_state = GameState::Gameplay;
-		}
-
-		return next_state;
-	}
-};
 
 struct GameplayState : public State {
 	enum class SubState {
@@ -120,7 +110,7 @@ struct GameplayState : public State {
 		auto& s = reg.emplace<Shape>(entity, prototypes[ShapePrototypes::Square]);
 		s.color = olc::YELLOW;
 
-		utilities::random::uniform_real_distribution<float> dist {0, olc::utils::geom2d::pi * 2.0f};
+		utilities::random::uniform_real_distribution<float> dist {0, static_cast<float>(olc::utils::geom2d::pi) * 2.0f};
 		const float angle = dist(rng);
 
 		// Position the enemy to spawn outside the visiable map area
@@ -136,7 +126,7 @@ struct GameplayState : public State {
 		auto& s = reg.emplace<Shape>(entity, prototypes[type]);
 		s.MoveTo(pos);
 		s.color = color;
-		utilities::random::uniform_real_distribution<float> dist {0, olc::utils::geom2d::pi * 2.0f};
+		utilities::random::uniform_real_distribution<float> dist {0, static_cast<float>(olc::utils::geom2d::pi) * 2.0f};
 		s.theta = dist(rng);
 		reg.emplace<ParticleComponent>(entity);
 		auto& p = reg.emplace<PhysicsComponent>(entity);
@@ -150,7 +140,7 @@ struct GameplayState : public State {
 		score += 1.0f;
 
 		for(int i = 0; i < 4; i++) {
-			utilities::random::uniform_real_distribution<float> dist {0, olc::utils::geom2d::pi * 2.0f};
+			utilities::random::uniform_real_distribution<float> dist {0, static_cast<float>(olc::utils::geom2d::pi) * 2.0f};
 			const float angle = dist(rng);
 			spawnParticle(e.position, olc::vf2d{1.0, angle}.cart(), utilities::RandomColor(), static_cast<ShapePrototypes>(rand() % 9));
 		}
@@ -175,7 +165,7 @@ struct GameplayState : public State {
 
 	void on_spawn_enemy(const SpawnDescriptor& spawn)  {
 		// Find a random position to spawn enemies near
-		utilities::random::uniform_real_distribution<float> dist {0, olc::utils::geom2d::pi * 2.0f};
+		utilities::random::uniform_real_distribution<float> dist {0, static_cast<float>(olc::utils::geom2d::pi) * 2.0f};
 		utilities::random::uniform_real_distribution<float> dist_a {0.0f, 50.0f};
 		
 		const float angle = dist(rng);
@@ -478,7 +468,7 @@ public:
 			std::array<olc::vf2d, 5> outer_points;
 
 			for(int i = 0; i < 5; i++) {
-				float outer_angle = ((90.0f - (72.0f * i)) * olc::utils::geom2d::pi) / 180.0f;
+				float outer_angle = ((90.0f - (72.0f * i)) * static_cast<float>(olc::utils::geom2d::pi)) / 180.0f;
 				outer_points[i] = olc::vf2d{-8.0f * std::cosf(outer_angle), -8.0f * std::sinf(outer_angle)};
 
 				// Both the pentagon and star52 shapes have the same weapon mount points
@@ -511,7 +501,7 @@ public:
 		{
 			std::array<olc::vf2d, 6> points;
 			for(int i = 0; i < 6; i++) {
-				float angle = ((90.0f - (60.0f * i)) * olc::utils::geom2d::pi) / 180.0f;
+				float angle = ((90.0f - (60.0f * i)) * static_cast<float>(olc::utils::geom2d::pi)) / 180.0f;
 				points[i] = olc::vf2d{-8.0f * std::cosf(angle), -8.0f * std::sinf(angle)};
 
 				// Add the weapon points, but only half to the triangle
@@ -538,7 +528,7 @@ public:
 		{
 			std::array<olc::vf2d, 8> points;
 			for(int i = 0; i < 8; i++) {
-				float angle = ((90.0f - (45.0f * i)) * olc::utils::geom2d::pi) / 180.0f;
+				float angle = ((90.0f - (45.0f * i)) * static_cast<float>(olc::utils::geom2d::pi)) / 180.0f;
 				points[i] = olc::vf2d{-8.0f * std::cosf(angle), -8.0f * std::sinf(angle)};
 
 				star82_proto.weapon_points.push_back(points[i]);
@@ -566,7 +556,7 @@ public:
 		{
 			std::array<olc::vf2d, 9> points;
 			for(int i = 0; i < 9; i++) {
-				float angle = ((90.0f - (40.0f * i)) * olc::utils::geom2d::pi) / 180.0f;
+				float angle = ((90.0f - (40.0f * i)) * static_cast<float>(olc::utils::geom2d::pi)) / 180.0f;
 				points[i] = olc::vf2d{-8.0f * std::cosf(angle), -8.0f * std::sinf(angle)};
 
 				star93_proto.weapon_points.push_back(points[i]);
@@ -584,7 +574,7 @@ public:
 		{
 			std::array<olc::vf2d, 7> points;
 			for(int i = 0; i < 7; i++) {
-				float angle = ((90.0f - ((360.0f/7.0f) * i)) * olc::utils::geom2d::pi) / 180.0f;
+				float angle = ((90.0f - ((360.0f/7.0f) * i)) * static_cast<float>(olc::utils::geom2d::pi)) / 180.0f;
 				points[i] = olc::vf2d{-8.0f * std::cosf(angle), -8.0f * std::sinf(angle)};
 
 				star73_proto.weapon_points.push_back(points[i]);

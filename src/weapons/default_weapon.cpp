@@ -21,7 +21,7 @@ void Weapon::Clone(const Weapon& other) {
 
 void Weapon::on_player_input(const PlayerInput& input) {
     aim_direction = input.aim_direction;
-    shape.theta = input.aim_direction.polar().y + olc::utils::geom2d::pi / 2.0f;
+    shape.theta = input.aim_direction.polar().y + static_cast<float>(olc::utils::geom2d::pi) / 2.0f;
 }
 
 void Weapon::OnUserUpdate(float fElapsedTime) {
