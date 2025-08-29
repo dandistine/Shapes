@@ -63,7 +63,7 @@ void DarkTriadLeadInSystem::OnUserUpdate(float fElapsedTime) {
             p.mass = 3.0f;
             s.scale = 10.0f;
             s.color = utilities::RandomDarkColor();
-            s.MoveTo({pge->ScreenWidth() * -0.2, 0.5f * pge->ScreenHeight()});
+            s.MoveTo({static_cast<float>(pge->ScreenWidth()) * -0.2f, 0.5f * static_cast<float>(pge->ScreenHeight())});
         }
 
                 {
@@ -78,7 +78,7 @@ void DarkTriadLeadInSystem::OnUserUpdate(float fElapsedTime) {
             p.mass = 3.0f;
             s.scale = 10.0f;
             s.color = utilities::RandomDarkColor();
-            s.MoveTo({pge->ScreenWidth() * 1.2, 0.5f * pge->ScreenHeight()});
+            s.MoveTo({static_cast<float>(pge->ScreenWidth()) * 1.2f, 0.5f * static_cast<float>(pge->ScreenHeight())});
         }
 
         did_spawn = true;
@@ -252,7 +252,7 @@ void DarkTriadBossSystem::OnUserUpdate(float fElapsedTime) {
         // Draw the boss name
         std::string boss_name = "The Dark Triad";
         olc::vf2d name_size = pge->GetTextSize(boss_name) * olc::vf2d{4.0f, 4.0f};
-        olc::vf2d name_pos = olc::vf2d{pge->ScreenWidth() * 0.5f, pge->ScreenHeight() - 60} - name_size * 0.5f;
+        olc::vf2d name_pos = olc::vf2d{static_cast<float>(pge->ScreenWidth()) * 0.5f, static_cast<float>(pge->ScreenHeight()) - 60} - name_size * 0.5f;
         pge->DrawStringDecal(name_pos, boss_name, olc::WHITE, {4.0f, 4.0f});
 
         //pge->DrawStringDecal()

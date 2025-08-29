@@ -77,8 +77,8 @@ GameState MenuState::OnUserUpdate(float fElapsedTime) {
                 const float end_angle = start_angle + static_cast<float>(olc::utils::geom2d::pi) + (dist(rng) - static_cast<float>(olc::utils::geom2d::pi)) / 4.0f;
                 
                 LerpComponent l;
-                l.start = olc::vf2d{pge->ScreenWidth(), start_angle}.cart() + pge->GetScreenSize() / 2.0f;
-                l.end = olc::vf2d{pge->ScreenWidth(), end_angle}.cart() + pge->GetScreenSize() / 2.0f;
+                l.start = olc::vf2d{static_cast<float>(pge->ScreenWidth()), start_angle}.cart() + pge->GetScreenSize() / 2.0f;
+                l.end = olc::vf2d{static_cast<float>(pge->ScreenWidth()), end_angle}.cart() + pge->GetScreenSize() / 2.0f;
                 l.total_time = 10.0f + dist(rng);
                 
                 Shape s{prototypes[static_cast<ShapePrototypes>(rand() % prototypes.size())]};

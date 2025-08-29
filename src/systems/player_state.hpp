@@ -21,7 +21,7 @@ struct PlayerStateSystem : public System {
         auto& s = reg.get<Shape>(player_entity);
         const auto v = s.scale * 8.0f;
         s.position.x = std::max(v, std::min(pge->ScreenWidth() - v, s.position.x));
-        s.position.y = std::max(v, std::min(pge->ScreenHeight() - v, s.position.y));
+        s.position.y = std::max(v + 110, std::min(pge->ScreenHeight() - v, s.position.y));
 
 		if(p.health <= 0.0f) {
 			dispatcher.enqueue(PlayerDied{});

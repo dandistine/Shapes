@@ -99,5 +99,6 @@ Weapon::Weapon(Weapon&& other) : reg(other.reg), dispatcher(other.dispatcher), s
 }
 
 Weapon::~Weapon() {
+
     dispatcher.sink<PlayerInput>().disconnect(this);
 }

@@ -32,15 +32,16 @@ target_include_directories(${CMAKE_PROJECT_NAME}
 )
 
 set_property(TARGET ${CMAKE_PROJECT_NAME} PROPERTY CXX_STANDARD 20)
-
+# add_compile_options(-fsanitize=address)
+# add_link_options(-fsanitize=address)
 
 target_link_libraries(${CMAKE_PROJECT_NAME}
     PRIVATE
     olcpixelgameengine::olcpixelgameengine
-    simple_serialization::simple_serialization
-    pcg-cpp::pcg-cpp
+    #simple_serialization::simple_serialization
+    #pcg-cpp::pcg-cpp
     EnTT::EnTT
-    tinyxml2::tinyxml2
+    #tinyxml2::tinyxml2
     X11
     GL
     pthread

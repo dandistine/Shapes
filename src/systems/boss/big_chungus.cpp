@@ -122,7 +122,7 @@ void BigChungusBossSystem::OnUserUpdate(float fElapsedTime) {
         // Draw the boss name
         std::string boss_name = "Big Chungus";
         olc::vf2d name_size = pge->GetTextSize(boss_name) * olc::vf2d{4.0f, 4.0f};
-        olc::vf2d name_pos = olc::vf2d{pge->ScreenWidth() * 0.5f, pge->ScreenHeight() - 60} - name_size * 0.5f;
+        olc::vf2d name_pos = olc::vf2d{static_cast<float>(pge->ScreenWidth()) * 0.5f, static_cast<float>(pge->ScreenHeight()) - 60} - name_size * 0.5f;
         pge->DrawStringDecal(name_pos, boss_name, olc::WHITE, {4.0f, 4.0f});
 
         //pge->DrawStringDecal()

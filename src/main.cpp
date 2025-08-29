@@ -1,9 +1,9 @@
 #include "utilities/olcUTIL_Geometry2D.h"
 #include "olcPixelGameEngine.h"
-#include "extensions/olcPGEX_TransformedView.h"
-#include "utilities/olcUTIL_Camera2D.h"
+//#include "extensions/olcPGEX_TransformedView.h"
+//#include "utilities/olcUTIL_Camera2D.h"
 
-#include "SimpleSerialization.hpp"
+//#include "SimpleSerialization.hpp"
 
 #include "utilities/quad_tree.hpp"
 #include "utilities/random.hpp"
@@ -73,9 +73,11 @@ struct GameplayState : public State {
 	float enemy_cost {10.0f};
 	float score {0.0f};
 	float dead_time {0.0f};
+	int boss_kill_count {0};
 
-	entt::registry reg;
+	// Dispatcher must be first so that it will be destroyed after the registry
 	entt::dispatcher dispatcher;
+	entt::registry reg;
 
 	std::mt19937_64 rng{std::random_device{}()};
 
@@ -242,10 +244,12 @@ struct GameplayState : public State {
 
 		if(factory_id == 0) {
 			factory = std::make_unique<DarkTriadFactory>(dispatcher, player_entity, reg, pge);
+			factory = std::make_unique<BigChungusFactory>(dispatcher, player_entity, reg, pge);
 		} else if (factory_id == 1) {
 			factory = std::make_unique<BigChungusFactory>(dispatcher, player_entity, reg, pge);
 		} else {
 			factory = std::make_unique<VenusSigilFactory>(dispatcher, player_entity, reg, pge);
+			factory = std::make_unique<BigChungusFactory>(dispatcher, player_entity, reg, pge);
 		}
 
 		boss_lead_in_system = factory->GetLeadInSystem(spawn.power);
@@ -262,6 +266,7 @@ struct GameplayState : public State {
 
 	void on_boss_kill(const BossKill& kill) {
 		next_state = SubState::BossLeadOut;
+		boss_kill_count++;
 		//std::cout << "Boss Dead" << std::endl;
 
 		auto& s = reg.get<Shape>(player_entity);
@@ -426,11 +431,35 @@ struct GameplayState : public State {
 		draw_system->OnUserUpdate(fElapsedTime);
 
 		{
-			pge->DrawStringDecal({10.0f, 10.0f}, std::format("Score : {}", score), olc::WHITE, olc::vf2d{3.0f, 3.0f});
-			pge->DrawStringDecal({10.0f, 40.0f}, std::format("Timer : {}", fTotalTime), olc::WHITE, olc::vf2d{3.0f, 3.0f});
-			pge->DrawStringDecal({10.0f, 70.0f}, std::format("Level : {}", reg.get<PlayerComponent>(player_entity).level), olc::WHITE, olc::vf2d{3.0f, 3.0f});
-			pge->DrawStringDecal({10.0f, 100.0f}, std::format("Health: {}", reg.get<PlayerComponent>(player_entity).health), olc::WHITE, olc::vf2d{3.0f, 3.0f});
-			pge->DrawStringDecal({10.0f, 130.0f}, std::format("Xp    : {}", reg.get<PlayerComponent>(player_entity).experience), olc::WHITE, olc::vf2d{3.0f, 3.0f});
+			const auto& p = reg.get<PlayerComponent>(player_entity);
+			pge->SetDrawTarget(static_cast<uint8_t>(0));
+    		float health_width = utilities::lerp(0.0f, pge->ScreenWidth() - 20.0f, p.health / p.max_health);
+    		float experience_width = utilities::lerp(0.0f, pge->ScreenWidth() - 20.0f, p.experience / p.xp_to_next_level);
+			// Draw a health bar across the top
+			pge->FillRectDecal({10.0f, 10.0f}, {pge->ScreenWidth() - 20.0f, 20.0f}, olc::DARK_GREY);
+    		pge->FillRectDecal({10.0f, 10.0f}, {health_width, 20.0f}, olc::GREEN);
+			// Draw an experience bar across the top
+			pge->FillRectDecal({10.0f, 40.0f}, {pge->ScreenWidth() - 20.0f, 20.0f}, olc::DARK_GREY);
+    		pge->FillRectDecal({10.0f, 40.0f}, {experience_width, 20.0f}, olc::DARK_GREEN);
+			
+			// Draw the score on the left
+			pge->DrawStringDecal({10.0f, 70.0f}, std::format("Score : {}", score), olc::WHITE, olc::vf2d{3.0f, 3.0f});
+			
+			// Draw the timer in the center
+			int minutes = static_cast<int>(fTotalTime / 60);
+			int seconds = static_cast<int>(std::fmodf(fTotalTime, 60.0f));
+			std::string timer_string = std::format("{}:{:02}", minutes, seconds);
+			olc::vf2d timer_str_size = pge->GetTextSize(timer_string) * olc::vf2d{3.0f, 3.0f};
+			pge->DrawStringDecal({(pge->ScreenWidth() - timer_str_size.x) / 2.0f, 70.0f}, timer_string, olc::WHITE, olc::vf2d{3.0f, 3.0f});
+
+			// Draw a boss kill count on the right
+			std::string boss_kill_str = std::format("Bosses : {}", boss_kill_count);
+			olc::vf2d boss_kill_size = pge->GetTextSize(boss_kill_str) * olc::vf2d{3.0f, 3.0f};
+			pge->DrawStringDecal({pge->ScreenWidth() - boss_kill_size.x - 10.0f, 70.0f}, boss_kill_str, olc::WHITE, olc::vf2d{3.0f, 3.0f});
+			//pge->DrawStringDecal({10.0f, 70.0f}, std::format("Level : {}", reg.get<PlayerComponent>(player_entity).level), olc::WHITE, olc::vf2d{3.0f, 3.0f});
+			//pge->DrawStringDecal({10.0f, 100.0f}, std::format("Health: {}", reg.get<PlayerComponent>(player_entity).health), olc::WHITE, olc::vf2d{3.0f, 3.0f});
+			//pge->DrawStringDecal({10.0f, 130.0f}, std::format("Xp    : {}", reg.get<PlayerComponent>(player_entity).experience), olc::WHITE, olc::vf2d{3.0f, 3.0f});
+			pge->SetDrawTarget(static_cast<uint8_t>(1));
 
 			// pge->DrawStringDecal({10.0f, 70.0f}, std::format("Enemy: {}", enemyTimer), olc::WHITE, olc::vf2d{3.0f, 3.0f});
 			// pge->DrawStringDecal({10.0f, 100.0f}, std::format("Power: {}", 1 + std::powf(2, fTotalTime / 40.0f)), olc::WHITE, olc::vf2d{3.0f, 3.0f});
@@ -489,17 +518,7 @@ public:
 
 		game_states.insert(std::make_pair(GameState::Menu, std::make_unique<MenuState>(this)));
 		game_states.insert(std::make_pair(GameState::Gameplay, std::make_unique<GameplayState>(this)));
-
-		// Generate the prototypes
-		// Prototype triangle_proto;
-		// triangle_proto.tris.push_back(olc::utils::geom2d::triangle<float>{{0, -8}, {8, 8}, {-8, 8}});
-		// prototypes.insert({ShapePrototypes::Triangle, triangle_proto});
-
-		// Prototype square_proto;
-		// square_proto.tris.push_back(olc::utils::geom2d::triangle<float>{{-8, -8}, {8, -8}, {-8, 8}});
-		// square_proto.tris.push_back(olc::utils::geom2d::triangle<float>{{8, -8}, {8, 8}, {-8, 8}});
-		// prototypes.insert({ShapePrototypes::Square, square_proto});
-		
+	
 		// Create the cursor shape
 		Prototype cursor_proto;
 		cursor_proto.tris.push_back(olc::utils::geom2d::triangle<float>{{0, -8}, {8, 8}, {0, 0}});
