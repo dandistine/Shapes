@@ -17,7 +17,7 @@ struct WeaponPrototype {
 	int projectile_count {1};
 	int hit_count {1};
 	float aim_variance {0.2f};
-	float damage {10.0f};
+	float damage {11.0f};
 	float fire_cost {.35f};
 	float angular_velocity {0.0f};
 	float duration {10.0f};

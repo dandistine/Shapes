@@ -37,7 +37,7 @@ void BigChungusLeadInSystem::OnUserUpdate(float fElapsedTime) {
         auto& p = reg.emplace<PhysicsComponent>(entity);
         auto& s = reg.emplace<Shape>(entity, prototypes[ShapePrototypes::Star9_3]);
 
-        e.health = 8000.0f * (power + 1);
+        e.health = 7000.0f + 8000.0f * power;
         e.damage = 10.0f;
         p.angular_velocity = .30f;
         p.mass = 10.0f;
@@ -95,7 +95,7 @@ void BigChungusBossSystem::on_boss_main(const BeginBossMain& boss) {
 }
 
 void BigChungusBossSystem::OnUserUpdate(float fElapsedTime) {
-    float total_health = 8000.0f * (power + 1);
+    float total_health = 7000.0f + 8000.0f * power;
     float health {0.0f};
     if(reg.valid(boss_entity)) {
         const auto& e = reg.get<EnemyComponent>(boss_entity);
