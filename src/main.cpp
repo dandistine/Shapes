@@ -462,8 +462,8 @@ struct GameplayState : public State {
 		{
 			const auto& p = reg.get<PlayerComponent>(player_entity);
 			pge->SetDrawTarget(static_cast<uint8_t>(0));
-    		float health_width = utilities::lerp(0.0f, pge->ScreenWidth() - 20.0f, p.health / p.max_health);
-    		float experience_width = utilities::lerp(0.0f, pge->ScreenWidth() - 20.0f, p.experience / p.xp_to_next_level);
+    		float health_width = std::max(0.0f, utilities::lerp(0.0f, pge->ScreenWidth() - 20.0f, p.health / p.max_health));
+    		float experience_width = std::max(0.0f, utilities::lerp(0.0f, pge->ScreenWidth() - 20.0f, p.experience / p.xp_to_next_level));
 			// Draw a health bar across the top
 			pge->FillRectDecal({10.0f, 10.0f}, {pge->ScreenWidth() - 20.0f, 20.0f}, olc::DARK_GREY);
     		pge->FillRectDecal({10.0f, 10.0f}, {health_width, 20.0f}, olc::GREEN);
