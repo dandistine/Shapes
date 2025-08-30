@@ -49,6 +49,9 @@ struct SpawnBullet {
 	// bullet shape
 	ShapePrototypes shape;
     olc::Pixel color;
+
+	// Functor called whgen an enemy is hit
+	std::function<void(entt::registry&, entt::dispatcher&, olc::vf2d)> on_hit_func {[](entt::registry&, entt::dispatcher&, olc::vf2d){}};
     // Functor called when an enemy is killed
    	std::function<void(entt::registry&, entt::dispatcher&, olc::vf2d)> on_kill_func {[](entt::registry&, entt::dispatcher&, olc::vf2d){}};
 

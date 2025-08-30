@@ -28,6 +28,8 @@ struct WeaponPrototype {
 	olc::Pixel color {olc::WHITE};
 	// Function to levelup the weapon some number of times
 	std::function<void(WeaponPrototype&, int count)> LevelUpFunction;
+	// Function that can be called when an enemy is hit by this weapon
+	std::function<void(entt::registry&, entt::dispatcher&, olc::vf2d)> on_hit_func {[](entt::registry&, entt::dispatcher&, olc::vf2d){}};
 	// Function that can be called when an enemy is killed by this weapon
 	std::function<void(entt::registry&, entt::dispatcher&, olc::vf2d)> on_kill_func {[](entt::registry&, entt::dispatcher&, olc::vf2d){}};
 	ShapePrototypes type {ShapePrototypes::Triangle};

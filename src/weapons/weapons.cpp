@@ -53,7 +53,7 @@ WeaponPrototype BurstWeapon{
             weapon.fire_cost = std::max(1.5f, weapon.fire_cost * std::powf(.95f, count));
         }
     },
-    .on_kill_func {
+    .on_hit_func {
         [](entt::registry& reg, entt::dispatcher& dispatcher, olc::vf2d position) {
             utilities::random::uniform_real_distribution<float> dist{static_cast<float>(olc::utils::geom2d::pi), -static_cast<float>(olc::utils::geom2d::pi)};
             // Spawn a bunch of projectiles
@@ -67,7 +67,7 @@ WeaponPrototype BurstWeapon{
                 spawn.initial_velocity = olc::vf2d{200.0f + r1, r2}.cart();
                 spawn.angular_velocity = r3;
                 spawn.hit_count = 1;
-                spawn.damage = 10.0f;
+                spawn.damage = 3.0f;
                 spawn.duration = 3.0f;
                 spawn.angular_velocity = r1 + r2;
                 spawn.scale = 0.4f;
@@ -102,7 +102,7 @@ WeaponPrototype RapidFireWeapon {
 };
 
 WeaponPrototype MineLayerWeapon {
-    .damage {250.0f},
+    .damage {50.0f},
     .fire_cost {3.0f},
     .angular_velocity {-0.5},
     .initial_velocity {0.0f},
@@ -117,7 +117,7 @@ WeaponPrototype MineLayerWeapon {
             weapon.level += count;
         }
     },
-    .on_kill_func {
+    .on_hit_func {
         [](entt::registry& reg, entt::dispatcher& dispatcher, olc::vf2d position) {
             utilities::random::uniform_real_distribution<float> dist{static_cast<float>(olc::utils::geom2d::pi), -static_cast<float>(olc::utils::geom2d::pi)};
             // Spawn a bunch of projectiles

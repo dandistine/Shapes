@@ -48,6 +48,8 @@ struct BulletSystem : public System {
                     b.hit_count--;
 					e.health -= b.damage;
 
+					b.on_hit_func(reg, dispatcher, b_shape.position);
+
 					// Need to handle the Dark Triad boss specially
 					if(e.health <= 0.0f && !reg.storage<DarkTriadMember>().contains(e_entity)) {
                         //std::cout << "Killing " << entt::to_integral(e_entity) << std::endl;

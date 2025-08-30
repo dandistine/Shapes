@@ -42,6 +42,7 @@ void Weapon::OnUserUpdate(float fElapsedTime) {
             spawn.position = position;
             spawn.scale = prototype.scale;
             spawn.shape = prototype.type;
+            spawn.on_hit_func = prototype.on_hit_func;
             spawn.on_kill_func = prototype.on_kill_func;
             spawn.color = prototype.color;
 
