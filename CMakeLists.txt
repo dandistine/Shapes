@@ -24,6 +24,7 @@ add_executable (${CMAKE_PROJECT_NAME}
     src/systems/boss/venus_sigil.cpp
     src/systems/boss/dark_triad.cpp
     src/states/menu_state.cpp
+    src/audio_manager.cpp
 )
 
 target_include_directories(${CMAKE_PROJECT_NAME}
@@ -63,8 +64,10 @@ if (EMSCRIPTEN)
     -sMAX_WEBGL_VERSION=2
     -sMIN_WEBGL_VERSION=2
     -sUSE_LIBPNG=1
+    -sSTACK_SIZE=131072
     -sSINGLE_FILE
     --shell-file ${CMAKE_CURRENT_LIST_DIR}/basic_template.html
+    --preload-file ${CMAKE_SOURCE_DIR}/assets@assets
   )
 
   target_link_libraries(${CMAKE_PROJECT_NAME} PRIVATE

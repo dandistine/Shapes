@@ -25,6 +25,7 @@ struct PlayerStateSystem : public System {
 
 		if(p.health <= 0.0f) {
 			dispatcher.enqueue(PlayerDied{});
+            dispatcher.enqueue<PlayRandomEffect>({"lose"});
 		}
 
 	}

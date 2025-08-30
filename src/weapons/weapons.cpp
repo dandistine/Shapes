@@ -75,6 +75,7 @@ WeaponPrototype BurstWeapon{
                 spawn.color = utilities::RandomRedColor();
 
                 dispatcher.enqueue(spawn);
+                dispatcher.enqueue<PlayRandomEffect>({"explode"});
             }
         }
     },
@@ -138,6 +139,7 @@ WeaponPrototype MineLayerWeapon {
                 spawn.color = utilities::RandomRedColor();
 
                 dispatcher.enqueue(spawn);
+                dispatcher.enqueue<PlayRandomEffect>({"explode"});
             }
         }
     },

@@ -6,7 +6,7 @@
 #include "utilities/entt.hpp"
 
 struct EnemyAttackSystem : public System {
-	EnemyAttackSystem(entt::entity player, entt::registry& reg, olc::PixelGameEngine* pge) : player_entity(player), System(reg, pge) {};
+	EnemyAttackSystem(entt::dispatcher& dispatcher, entt::entity player, entt::registry& reg, olc::PixelGameEngine* pge) : dispatcher(dispatcher), player_entity(player), System(reg, pge) {};
 
 	void OnUserUpdate(float fElapsedTime) override {
 		const auto& view = reg.view<PhysicsComponent, Shape, EnemyComponent>();
@@ -26,9 +26,12 @@ struct EnemyAttackSystem : public System {
 				auto& player = reg.get<PlayerComponent>(player_entity);
 				player.health -= e.damage;
 				e.attack_timer = 0.0f;
+
+				dispatcher.enqueue<PlayRandomEffect>({"hit"});
 			}
 		}
 	}
 private:
+	entt::dispatcher& dispatcher;
 	entt::entity player_entity;
 };

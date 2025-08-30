@@ -1,9 +1,6 @@
 #include "utilities/olcUTIL_Geometry2D.h"
 #include "olcPixelGameEngine.h"
-//#include "extensions/olcPGEX_TransformedView.h"
-//#include "utilities/olcUTIL_Camera2D.h"
-
-//#include "SimpleSerialization.hpp"
+#include "olcPGEX_MiniAudio.h"
 
 #include "utilities/quad_tree.hpp"
 #include "utilities/random.hpp"
@@ -34,8 +31,11 @@
 #include "systems/player_state.hpp"
 #include "systems/boss_timer.hpp"
 #include "systems/boss/boss.hpp"
+#include "systems/music_system.hpp"
 
 #include "weapons/weapon.hpp"
+
+#include "audio_manager.hpp"
 
 #include <vector>
 #include <random>
@@ -51,6 +51,11 @@ std::array<ShapePrototypes, 7> shape_progression {ShapePrototypes::Triangle, Sha
 std::map<ShapePrototypes, Prototype> prototypes;
 
 std::mt19937_64 rng;
+
+std::map<std::string, int> sound_map;
+olc::MiniAudio* audio {nullptr};
+
+AudioManager audio_manager;
 
 
 struct GameplayState : public State {
@@ -96,6 +101,7 @@ struct GameplayState : public State {
 	std::unique_ptr<System> player_state_system;
 	std::unique_ptr<System> levelup_pick_system;
 	std::unique_ptr<System> boss_timer_system;
+	std::unique_ptr<System> music_system;
 
 	std::unique_ptr<System> boss_lead_in_system;
 	std::unique_ptr<System> boss_system;
@@ -159,6 +165,9 @@ struct GameplayState : public State {
 			spawn.age = 0.0f;
 			dispatcher.enqueue(spawn);
 		}
+
+		audio->Play(audio_manager.GetSoundBank("kill").at(0));
+
 	}
 
 	// Event responding to certain player input
@@ -262,6 +271,7 @@ struct GameplayState : public State {
 
 	void on_boss_main(const BeginBossMain& boss) {
 		next_state = SubState::Boss;
+		
 		//std::cout << "Begin Fight" << std::endl;
 	}
 
@@ -277,12 +287,17 @@ struct GameplayState : public State {
 			auto& next_shape = prototypes[shape_progression[s.WeaponPoints().size() - 2]];
 			s.SetPrototype(next_shape);
 		}
+
+		if(boss_kill_count > 2) {
+			dispatcher.enqueue<PlayMusic>({audio_manager.RandomSound("tense"), 0.2f});
+		} else {
+			dispatcher.enqueue<PlayMusic>({audio_manager.RandomSound("normal"), 0.2f});
+		}
 	}
 
 	void on_boss_phase_done(const BossPhaseDone& phase) {
 		next_state = SubState::Normal;
 		//std::cout << "return to Normal" << std::endl;
-
 	}
 
 	void on_set_background_color(const SetBackgroundColor& color) {
@@ -291,6 +306,11 @@ struct GameplayState : public State {
 
 	void on_player_died(const PlayerDied& p) {
 		next_state = SubState::Dead;
+		dispatcher.enqueue<PlayMusic>({0, .25f});
+	}
+
+	void on_random_sound(const PlayRandomEffect& effect) {
+		audio->Play(audio_manager.RandomSound(effect.soundbank));
 	}
 
 	void EnterState() override {
@@ -304,7 +324,8 @@ struct GameplayState : public State {
 		dispatcher.sink<LevelUpOption>().connect<&GameplayState::on_levelup_option>(this);
 		dispatcher.sink<SetBackgroundColor>().connect<&GameplayState::on_set_background_color>(this);
 		dispatcher.sink<PlayerDied>().connect<&GameplayState::on_player_died>(this);
-		
+		dispatcher.sink<PlayRandomEffect>().connect<&GameplayState::on_random_sound>(this);
+
 		// Boss related events
 		dispatcher.sink<SpawnBoss>().connect<&GameplayState::on_spawn_boss>(this);
 		dispatcher.sink<BeginBossMain>().connect<&GameplayState::on_boss_main>(this);
@@ -331,16 +352,20 @@ struct GameplayState : public State {
 		spawn_enemy_system = std::make_unique<EnemySpawnSystem>(dispatcher, reg, pge);
 		bullet_system = std::make_unique<BulletSystem>(dispatcher, reg, pge);
 		particle_system = std::make_unique<ParticleSystem>(reg, pge);
-		enemy_attack_system = std::make_unique<EnemyAttackSystem>(player_entity, reg, pge);
+		enemy_attack_system = std::make_unique<EnemyAttackSystem>(dispatcher, player_entity, reg, pge);
 		player_weapons_system = std::make_unique<PlayerWeaponSystem>(player_entity, reg, pge);
-		experience_system = std::make_unique<ExperienceSystem>(player_entity, reg, pge);
+		experience_system = std::make_unique<ExperienceSystem>(dispatcher, player_entity, reg, pge);
 		player_state_system = std::make_unique<PlayerStateSystem>(dispatcher, player_entity, reg, pge);
 		levelup_pick_system = std::make_unique<LevelUpPickSystem>(dispatcher, player_entity, reg, pge);
+		music_system = std::make_unique<MusicSystem>(dispatcher, player_entity, reg, pge);
 		boss_timer_system = std::make_unique<BossTimerSystem>(dispatcher, reg, pge);
+
+		dispatcher.enqueue<PlayMusic>(audio_manager.RandomSound("normal"));
 	}
 
 	GameState OnUserUpdate(float fElapsedTime) override {
 		pge->Clear(background_color);
+		float music_time = fElapsedTime;
 
 		if(current_state == SubState::Dead) {
 			dead_time += fElapsedTime;
@@ -382,11 +407,14 @@ struct GameplayState : public State {
 		player_state_system->PreUpdate();
 		levelup_pick_system->PreUpdate();
 		boss_timer_system->PreUpdate();
+		music_system->PreUpdate();
 
 		// If we're in a boss state, perform the expected pre-updates
 
 
 		dispatcher.update();
+
+		music_system->OnUserUpdate(music_time);
 
 		if(current_state != SubState::LevelUpScreen) {
 			enemy_movement_system->OnUserUpdate(fElapsedTime);
@@ -420,8 +448,7 @@ struct GameplayState : public State {
 			
 			if(current_state != SubState::Dead) {
 				player_state_system->OnUserUpdate(fElapsedTime);
-			}
-			
+			}			
 		}
 
 		if(current_state == SubState::LevelUpScreen) {
@@ -499,6 +526,8 @@ public:
 	entt::registry reg;
 
 	GameplayState gameplay {this};
+
+	olc::MiniAudio ma;
 
 	Jam2025Shapes()
 	{
@@ -672,6 +701,17 @@ public:
 			prototypes.insert({ShapePrototypes::Star7_3, star73_proto});
 		}
 
+		// Load audio
+		audio_manager.Load("assets/audio_info", &ma);
+		//audio_manager.Load()
+		//sound_map["pop"] = ma.LoadSound("assets/Pop.wav");
+		//sound_map["tap"] = ma.LoadSound("assets/Tap.wav");
+
+		audio = &ma;
+
+		//AudioManager am;
+		//am.Load("assets/audio_info", audio);
+
 		return true;
 	}
 
@@ -716,7 +756,7 @@ int main()
 	std::cout << v << std::endl;
 	rng.seed(v);
 	Jam2025Shapes demo;
-	if (demo.Construct(1280, 960, 1, 1, false))
+	if (demo.Construct(1280, 960, 1, 1, false, true))
 		demo.Start();
 
 	return 0;

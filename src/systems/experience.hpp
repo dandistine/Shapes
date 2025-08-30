@@ -4,7 +4,7 @@
 #include "system.hpp"
 
 struct ExperienceSystem : public System {
-	ExperienceSystem(entt::entity player, entt::registry& reg, olc::PixelGameEngine* pge) : player_entity(player), System(reg, pge) {};
+	ExperienceSystem(entt::dispatcher& dispatcher, entt::entity player, entt::registry& reg, olc::PixelGameEngine* pge) : dispatcher(dispatcher), player_entity(player), System(reg, pge) {};
 
 	// Pickup experience touching the player
 	// Pull experience towards the player
@@ -26,6 +26,8 @@ struct ExperienceSystem : public System {
 				const auto& xp = view.get<ExperienceComponent>(entity);
 				player_component.experience += xp.value;
 				reg.destroy(entity);
+
+				dispatcher.enqueue<PlayRandomEffect>({"experience"});
 				continue;
 			}
 
@@ -39,5 +41,6 @@ struct ExperienceSystem : public System {
 	}
 
 private:
+	entt::dispatcher& dispatcher;
 	entt::entity player_entity;
 };

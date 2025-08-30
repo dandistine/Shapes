@@ -4,6 +4,7 @@
 
 #include "boss.hpp"
 #include "events.hpp"
+#include "audio_manager.hpp"
 
 #include "systems/system.hpp"
 
@@ -24,6 +25,7 @@ void DarkTriadLeadInSystem::OnUserUpdate(float fElapsedTime) {
             reg.destroy(e);
         }
         one_time = true;
+		dispatcher.enqueue<PlayMusic>({audio_manager.RandomSound("boss_triad"), 0.2f});
     }
 
     total_time += fElapsedTime;

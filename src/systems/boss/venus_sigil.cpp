@@ -5,6 +5,7 @@
 
 #include "boss.hpp"
 #include "events.hpp"
+#include "audio_manager.hpp"
 
 #include "systems/system.hpp"
 
@@ -40,6 +41,8 @@ void VenusSigilLeadInSystem::OnUserUpdate(float fElapsedTime) {
             reg.destroy(e);
         }
         one_time = true;
+		dispatcher.enqueue<PlayMusic>({audio_manager.RandomSound("boss_sigil"), 0.2f});
+
     }
 
     total_time += fElapsedTime;

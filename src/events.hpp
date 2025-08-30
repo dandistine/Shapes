@@ -106,3 +106,13 @@ struct SetBackgroundColor {
 struct PlayerDied {
 	
 };
+
+// Play a random sound from the specified soundbank
+struct PlayRandomEffect {
+	std::string soundbank;
+};
+
+struct PlayMusic {
+	int sound_id{0};
+	float fade_rate{1.0f};
+};
