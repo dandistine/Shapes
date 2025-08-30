@@ -3,6 +3,8 @@
 #include "components.hpp"
 #include "system.hpp"
 
+#include "utilities/global_rng.hpp"
+
 #include <random>
 
 struct SpawnDescriptor {
@@ -180,6 +182,6 @@ private:
 	float spawn_timer {0.0f};
 	float spawn_rate {2.0f};
 
-	std::mt19937_64 rng{std::random_device{}()};
+	//std::mt19937_64 rng{std::random_device{}()};
     std::uniform_int_distribution<int> random_factory{0, spawn_factories.size() - 1};
 };

@@ -14,6 +14,7 @@
 struct PlayerInput {
 	olc::vf2d move_direction {};
 	olc::vf2d aim_direction {};
+	float rotate {0.0f};
 	bool fire {false};
 };
 

@@ -84,5 +84,5 @@ private:
 	entt::registry& reg;
 	entt::dispatcher& dispatcher;
 	WeaponPrototype prototype;
-	std::mt19937_64 rng{std::random_device{}()};
+	//std::mt19937_64 rng{std::random_device{}()};
 };

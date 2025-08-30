@@ -3,6 +3,7 @@
 
 #include "utilities/random.hpp"
 #include "utilities/utility.hpp"
+#include "utilities/global_rng.hpp"
 
 
 // Create some random shapes that float by in the background

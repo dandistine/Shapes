@@ -50,6 +50,8 @@ std::array<ShapePrototypes, 7> shape_progression {ShapePrototypes::Triangle, Sha
 // Map of the potential prototypes
 std::map<ShapePrototypes, Prototype> prototypes;
 
+std::mt19937_64 rng;
+
 
 struct GameplayState : public State {
 	enum class SubState {
@@ -79,8 +81,6 @@ struct GameplayState : public State {
 	entt::dispatcher dispatcher;
 	entt::registry reg;
 
-	std::mt19937_64 rng{std::random_device{}()};
-
 	struct enemy_death{};
 
 	std::unique_ptr<System> physics_system;
@@ -104,6 +104,7 @@ struct GameplayState : public State {
 	SubState previous_state {SubState::Normal};
 	SubState current_state {SubState::Normal};
 	SubState next_state {SubState::Normal};
+	SubState saved_state {SubState::Normal};
 
 	olc::Pixel background_color {olc::VERY_DARK_GREY};
 
@@ -166,6 +167,7 @@ struct GameplayState : public State {
 		auto& p = reg.get<PhysicsComponent>(player_entity);
 
 		p.force = input.move_direction * 7000.0f;
+		p.angular_velocity = input.rotate;
 	}
 
 	void on_spawn_enemy(const SpawnDescriptor& spawn)  {
@@ -239,18 +241,16 @@ struct GameplayState : public State {
 		// Once the boss spawn is triggered, proceed to the boss lead in and choose a boss to spawn
 		next_state = SubState::BossLeadIn;
 
-		int factory_id = std::uniform_int_distribution<int>{0, 2}(rng);
+		int factory_id = std::uniform_int_distribution<int>{0, 26}(rng) % 3;
 
 		std::unique_ptr<BossFactory> factory;
 
 		if(factory_id == 0) {
 			factory = std::make_unique<DarkTriadFactory>(dispatcher, player_entity, reg, pge);
-			factory = std::make_unique<BigChungusFactory>(dispatcher, player_entity, reg, pge);
 		} else if (factory_id == 1) {
 			factory = std::make_unique<BigChungusFactory>(dispatcher, player_entity, reg, pge);
 		} else {
 			factory = std::make_unique<VenusSigilFactory>(dispatcher, player_entity, reg, pge);
-			factory = std::make_unique<BigChungusFactory>(dispatcher, player_entity, reg, pge);
 		}
 
 		boss_lead_in_system = factory->GetLeadInSystem(spawn.power);
@@ -321,7 +321,7 @@ struct GameplayState : public State {
 		s.MoveTo(pge->GetScreenSize() / 2.0f);
 		s.scale = 4.0f;
 		s.color = utilities::RandomBrightColor();
-		reg.emplace<PhysicsComponent>(player_entity);
+		auto& physics = reg.emplace<PhysicsComponent>(player_entity);
 		
 		// Create all the systems that will be run
 		physics_system = std::make_unique<PhysicsSystem>(reg, pge);
@@ -360,10 +360,11 @@ struct GameplayState : public State {
 		}
 
 		if(pge->GetKey(olc::Key::SPACE).bPressed) {
-			if((next_state != SubState::Pause) && (next_state != SubState::Dead)) {
+			if((current_state != SubState::Pause) && (current_state != SubState::Dead) && (current_state != SubState::LevelUpScreen)) {
 				next_state = SubState::Pause;
-			} else {
-				next_state = previous_state;
+				saved_state = current_state;
+			} else if (current_state == SubState::Pause) {
+				next_state = saved_state;
 			}
 		}
 
@@ -711,6 +712,9 @@ public:
 
 int main()
 {
+	auto v = std::random_device{}();
+	std::cout << v << std::endl;
+	rng.seed(v);
 	Jam2025Shapes demo;
 	if (demo.Construct(1280, 960, 1, 1, false))
 		demo.Start();

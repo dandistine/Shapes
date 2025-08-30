@@ -19,6 +19,6 @@ private:
     float spawn_rate {1.0f};
     std::vector<Shape> shapes;
     entt::registry reg;
-	std::mt19937_64 rng{std::random_device{}()};
+	//std::mt19937_64 rng{std::random_device{}()};
 
 };

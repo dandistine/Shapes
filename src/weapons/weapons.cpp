@@ -2,8 +2,9 @@
 
 #include "utilities/random.hpp"
 #include "utilities/utility.hpp"
+#include "utilities/global_rng.hpp"
 
-std::mt19937_64 weapon_rng {std::random_device{}()};
+//std::mt19937_64 weapon_rng {std::random_device{}()};
 
 WeaponPrototype DefaultWeapon {
     .name{"Standard"},
@@ -57,9 +58,9 @@ WeaponPrototype BurstWeapon{
             utilities::random::uniform_real_distribution<float> dist{static_cast<float>(olc::utils::geom2d::pi), -static_cast<float>(olc::utils::geom2d::pi)};
             // Spawn a bunch of projectiles
             for(int i = 0; i < 32; i++) {
-                float r1 = dist(weapon_rng);
-                float r2 = dist(weapon_rng);
-                float r3 = dist(weapon_rng);
+                float r1 = dist(rng);
+                float r2 = dist(rng);
+                float r3 = dist(rng);
 
                 SpawnBullet spawn;
                 spawn.position = position;
@@ -120,9 +121,9 @@ WeaponPrototype MineLayerWeapon {
             utilities::random::uniform_real_distribution<float> dist{static_cast<float>(olc::utils::geom2d::pi), -static_cast<float>(olc::utils::geom2d::pi)};
             // Spawn a bunch of projectiles
             for(int i = 0; i < 32; i++) {
-                float r1 = dist(weapon_rng);
-                float r2 = dist(weapon_rng);
-                float r3 = dist(weapon_rng);
+                float r1 = dist(rng);
+                float r2 = dist(rng);
+                float r3 = dist(rng);
 
                 SpawnBullet spawn;
                 spawn.position = position;

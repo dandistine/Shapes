@@ -1,7 +1,7 @@
 #include "weapon.hpp"
 
 #include "utilities/random.hpp"
-
+#include "utilities/global_rng.hpp"
 
 
 // Copy all of the non-reference attributes from another weapon

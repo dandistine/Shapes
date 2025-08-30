@@ -3,6 +3,8 @@
 #include "components.hpp"
 #include "system.hpp"
 
+#include "utilities/global_rng.hpp"
+
 extern std::array<ShapePrototypes, 7> shape_progression;
 
 // Map of the potential prototypes
@@ -36,7 +38,7 @@ struct LevelUpPickSystem : public System {
                 // Pick a random weapon type
                 auto weapon_index = std::uniform_int_distribution<int>{0, weapon_prototypes.size() - 1}(rng);
 
-                std::string description = std::format("Gain a {} weapon", weapon_prototypes[weapon_index]->name);
+                std::string description = std::format("[{}] Gain a {} weapon", i + 1, weapon_prototypes[weapon_index]->name);
                 auto functor = [&, weapon_index](entt::registry& reg, entt::entity e) {
                     auto& p = reg.get<PlayerComponent>(e);
                     p.weapons.emplace_back(reg, dispatcher, *(weapon_prototypes[weapon_index]));
@@ -66,7 +68,7 @@ struct LevelUpPickSystem : public System {
 		for(int i = options.size(); i < choice_count; i++) {
 			int weapon_slot = rand() % p.weapons.size();
 			const auto& weapon = p.weapons[weapon_slot];
-			std::string description = std::format("Improve {} weapon from level {} to {}", weapon.Name(), weapon.Level(), weapon.Level() + 1);
+			std::string description = std::format("[{}] Improve {} weapon from {} to {}", i + 1, weapon.Name(), weapon.Level(), weapon.Level() + 1);
 			//std::string description = "Improve weapon " + std::to_string(weapon_slot + 1);
 
 			auto functor = [weapon_slot](entt::registry& reg, entt::entity e) {
@@ -106,6 +108,6 @@ private:
 	entt::entity player_entity;
 	int choice_count {3};
 	std::vector<LevelUpOption> options;
-	std::mt19937_64 rng{std::random_device{}()};
+	//std::mt19937_64 rng{std::random_device{}()};
 
 };
