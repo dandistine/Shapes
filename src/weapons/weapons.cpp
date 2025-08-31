@@ -14,14 +14,56 @@ WeaponPrototype DefaultWeapon {
             weapon.damage *= std::powf(1.1f, count);
             weapon.aim_variance *= std::powf(0.99f, count);
             weapon.level += count;
+            weapon.projectile_count = 1 + weapon.level / 3;
         }
     }
+};
+
+WeaponPrototype SpreadWeapon {
+    .projectile_count {17},
+    .damage {8.0f},
+    .fire_cost {1.5f},
+    .duration {0.7f},
+    .initial_velocity {350.0f},
+    .name{"Spread"},
+    .color {utilities::RandomGreenColor()},
+    .LevelUpFunction {
+        [](WeaponPrototype& weapon, int count){
+            weapon.fire_cost *= std::powf(0.95f, count);
+            weapon.damage *= std::powf(1.1f, count);
+            weapon.duration *= std::powf(0.99f, count);
+            weapon.initial_velocity *= std::powf(0.99f, count);
+            weapon.level += count;
+            weapon.projectile_count = 16 + weapon.level;
+        }
+    },
+    .type {ShapePrototypes::Star7_3}
+};
+
+WeaponPrototype Nova {
+    .projectile_count {64},
+    .aim_variance {static_cast<float>(olc::utils::geom2d::pi)},
+    .damage {20.0f},
+    .fire_cost {5.0f},
+    .duration {3.0f},
+    .initial_velocity {150.0f},
+    .name{"Nova"},
+    .color {olc::DARK_YELLOW},
+    .LevelUpFunction {
+        [](WeaponPrototype& weapon, int count){
+            weapon.fire_cost *= std::powf(0.95f, count);
+            weapon.damage *= std::powf(1.1f, count);
+            weapon.level += count;
+            weapon.duration += static_cast<float>(count) * 0.3f;
+        }
+    },
+    .type {ShapePrototypes::Star8_2}
 };
 
 WeaponPrototype PierceWeapon {
     .hit_count {3},
     .aim_variance {0.07f},
-    .damage {30.0f},
+    .damage {34.0f},
     .fire_cost {1.0f},
     .initial_velocity {600.0f},
     .name{"Pierce"},
@@ -92,10 +134,11 @@ WeaponPrototype RapidFireWeapon {
     .color {utilities::RandomBlueColor()},
     .LevelUpFunction {
         [](WeaponPrototype& weapon, int count){
-            weapon.fire_cost *= std::powf(0.95f, count);
-            weapon.damage *= std::powf(1.1f, count);
+            weapon.fire_cost *= std::powf(0.9f, count);
+            weapon.damage += count;
             weapon.aim_variance *= std::powf(0.99f, count);
             weapon.level += count;
+            weapon.projectile_count = 1 + weapon.level / 7;
         }
     },
     .type {ShapePrototypes::Star6_2}
@@ -147,10 +190,12 @@ WeaponPrototype MineLayerWeapon {
 };
 
 
-std::array<WeaponPrototype*, 5> weapon_prototypes {
+std::array<WeaponPrototype*, 7> weapon_prototypes {
     &DefaultWeapon,
     &PierceWeapon,
     &BurstWeapon,
     &RapidFireWeapon,
-    &MineLayerWeapon
+    &MineLayerWeapon,
+    &SpreadWeapon,
+    &Nova
 };

@@ -17,7 +17,7 @@ struct WeaponPrototype {
 	int projectile_count {1};
 	int hit_count {1};
 	float aim_variance {0.2f};
-	float damage {11.0f};
+	float damage {13.0f};
 	float fire_cost {.35f};
 	float angular_velocity {0.0f};
 	float duration {10.0f};
@@ -35,7 +35,7 @@ struct WeaponPrototype {
 	ShapePrototypes type {ShapePrototypes::Triangle};
 };
 
-extern std::array<WeaponPrototype*, 5> weapon_prototypes;
+extern std::array<WeaponPrototype*, 7> weapon_prototypes;
 extern WeaponPrototype DefaultWeapon;
 extern WeaponPrototype PierceWeapon;
 extern WeaponPrototype BurstWeapon;

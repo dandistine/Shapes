@@ -756,7 +756,7 @@ int main()
 	std::cout << v << std::endl;
 	rng.seed(v);
 	Jam2025Shapes demo;
-	if (demo.Construct(1280, 960, 1, 1, false, true))
+	if (demo.Construct(1280, 960, 1, 1, false))
 		demo.Start();
 
 	return 0;

@@ -46,7 +46,7 @@ struct BulletSystem : public System {
 				if(b_shape.intersects(e_shape)) {
 					b.last_hit = e_entity;
                     b.hit_count--;
-					e.health -= b.damage;
+					e.health = std::max(0.0f, e.health - b.damage);
 
 					b.on_hit_func(reg, dispatcher, b_shape.position);
 
